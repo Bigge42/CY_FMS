@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.fms.mapper.CyFolderMapper">
+    
+    <resultMap type="CyFolder" id="CyFolderResult">
+        <result property="folderId"    column="folder_id"    />
+        <result property="parentId"    column="parent_id"    />
+        <result property="ancestors"    column="ancestors"    />
+        <result property="folderName"    column="folder_name"    />
+        <result property="folderCode"    column="folder_code"    />
+        <result property="absolutePath"    column="absolute_path"    />
+        <result property="orderNum"    column="order_num"    />
+        <result property="status"    column="status"    />
+        <result property="description"    column="description"    />
+        <result property="leader"    column="leader"    />
+        <result property="phone"    column="phone"    />
+        <result property="email"    column="email"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectCyFolderVo">
+        select folder_id, parent_id, ancestors, folder_name, folder_code, absolute_path, order_num, status, description, leader, phone, email, del_flag, create_by, create_time, update_by, update_time, remark from cy_folder
+    </sql>
+
+    <select id="selectCyFolderList" parameterType="CyFolder" resultMap="CyFolderResult">
+        <include refid="selectCyFolderVo"/>
+        <where>  
+            <if test="parentId != null "> and parent_id = #{parentId}</if>
+            <if test="ancestors != null  and ancestors != ''"> and ancestors = #{ancestors}</if>
+            <if test="folderName != null  and folderName != ''"> and folder_name like concat('%', #{folderName}, '%')</if>
+            <if test="folderCode != null  and folderCode != ''"> and folder_code = #{folderCode}</if>
+            <if test="absolutePath != null  and absolutePath != ''"> and absolute_path = #{absolutePath}</if>
+            <if test="orderNum != null "> and order_num = #{orderNum}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="description != null  and description != ''"> and description = #{description}</if>
+            <if test="leader != null  and leader != ''"> and leader = #{leader}</if>
+            <if test="phone != null  and phone != ''"> and phone = #{phone}</if>
+            <if test="email != null  and email != ''"> and email = #{email}</if>
+        </where>
+    </select>
+    
+    <select id="selectCyFolderByFolderId" parameterType="Long" resultMap="CyFolderResult">
+        <include refid="selectCyFolderVo"/>
+        where folder_id = #{folderId}
+    </select>
+
+    <insert id="insertCyFolder" parameterType="CyFolder" useGeneratedKeys="true" keyProperty="folderId">
+        insert into cy_folder
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="parentId != null">parent_id,</if>
+            <if test="ancestors != null">ancestors,</if>
+            <if test="folderName != null and folderName != ''">folder_name,</if>
+            <if test="folderCode != null">folder_code,</if>
+            <if test="absolutePath != null">absolute_path,</if>
+            <if test="orderNum != null">order_num,</if>
+            <if test="status != null">status,</if>
+            <if test="description != null">description,</if>
+            <if test="leader != null">leader,</if>
+            <if test="phone != null">phone,</if>
+            <if test="email != null">email,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="parentId != null">#{parentId},</if>
+            <if test="ancestors != null">#{ancestors},</if>
+            <if test="folderName != null and folderName != ''">#{folderName},</if>
+            <if test="folderCode != null">#{folderCode},</if>
+            <if test="absolutePath != null">#{absolutePath},</if>
+            <if test="orderNum != null">#{orderNum},</if>
+            <if test="status != null">#{status},</if>
+            <if test="description != null">#{description},</if>
+            <if test="leader != null">#{leader},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="email != null">#{email},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateCyFolder" parameterType="CyFolder">
+        update cy_folder
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            <if test="ancestors != null">ancestors = #{ancestors},</if>
+            <if test="folderName != null and folderName != ''">folder_name = #{folderName},</if>
+            <if test="folderCode != null">folder_code = #{folderCode},</if>
+            <if test="absolutePath != null">absolute_path = #{absolutePath},</if>
+            <if test="orderNum != null">order_num = #{orderNum},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="leader != null">leader = #{leader},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where folder_id = #{folderId}
+    </update>
+
+    <delete id="deleteCyFolderByFolderId" parameterType="Long">
+        delete from cy_folder where folder_id = #{folderId}
+    </delete>
+
+    <delete id="deleteCyFolderByFolderIds" parameterType="String">
+        delete from cy_folder where folder_id in 
+        <foreach item="folderId" collection="array" open="(" separator="," close=")">
+            #{folderId}
+        </foreach>
+    </delete>
+</mapper>
