@@ -1,0 +1,1010 @@
+﻿﻿<!--更多资源：https://gitee.com/iGaoWei/big-data-view -->
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <script type="text/javascript" src="/毛坯库看板/js/jquery.js"></script>
+  <script type="text/javascript" src="/毛坯库看板/js/echarts.min.js"></script>
+  <!-- <script type="text/javascript" src="js/js.js"></script> -->
+  <script type="text/javascript" src="/毛坯库看板/js/jquery.limarquee.js"></script>
+  <script type="text/javascript" src="/毛坯库看板/js/jquery.cxselect.min.js"></script>
+  <script type="text/javascript" src="/毛坯库看板/js/echarts.min.js"></script>
+  <!-- import CSS -->
+  <link rel="stylesheet" href="/毛坯库看板/css/index.css">
+  <!-- import Vue before Element -->
+  <script src="/毛坯库看板/js/vue.js"></script>
+  <script src="/毛坯库看板/js/vue-resource.js"></script>
+  <!-- import JavaScript -->
+  <script src="/毛坯库看板/js/index.js"></script>
+  <link rel="stylesheet" href="/毛坯库看板/css/comon0.css">
+</head>
+<style>
+  .companytitle {
+    padding: 12px 20px 0 20px;
+    display: flex;
+  }
+
+  .companytitle span {
+    color: #fff;
+  }
+
+  .el-tag {
+    FONT-WEIGHT: 50;
+    background-color: #00b7ff;
+    border-color: #6b8daf;
+    height: 30px;
+    padding: 0 30px;
+    line-height: 30px;
+    font-size: 20px;
+    color: #ff4040;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 4px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    margin-left: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .comunryright {
+    font-size: 20px;
+    padding: 4px;
+    font-family: Microsoft YaHei;
+    font-weight: 20;
+    color: #26315C;
+  }
+
+  .el-table {
+    border-bottom: 0px solid #000;
+    border-right: 0px solid #000;
+    background-color: transparent;
+    margin: 0 auto;
+  }
+
+  .el-table th.el-table__cell {
+    background-color: #3a8ee6;
+    color: #fff;
+
+  }
+
+  .el-table .cell {
+    text-align: center;
+    color: #ffffff;
+  }
+
+  .el-table .transparent {
+    background-color: transparent;
+  }
+</style>
+
+<body dg-chart-theme="{'color':'#ffffff'}">
+  <div id='app' style="background:#000d4a url(images/bg.jpg) center top;">
+    <div class="head" style="height:10%;">
+      <h1>毛坯库智能立体仓储运营看板</h1>
+      <div class="weather"><span id="showTime"></span></div>
+    </div>
+
+    <div class="mainbox">
+      <ul class="clearfix">
+        <li>
+          <div class="boxall" style="height:50%;">
+
+            <div class="yqlist">
+              <ul class="clearfix">
+                <li>
+                  <div class="yq">{{params.yfjs}}</div>
+                  <span>应发件数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.yfpjs}}</div>
+                  <span>已分配件数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.yjhjs}}</div>
+                  <span>已拣货件数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.djhtps}}</div>
+                  <span>待拣货托盘数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.dsjs}}</div>
+                  <span>待上架数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.jlrs}}</div>
+                  <span>叫料人数</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.fhwgl}}%</div>
+                  <span>发货完工率</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.uph}}</div>
+                  <span>UPH</span>
+                </li>
+                <li>
+                  <div class="yq">{{params.hwksys}}</div>
+                  <span>货位可使用数</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </li>
+        <li style="width:40%">
+          <div class="boxall" style="height:50%;">
+            <div class="companytitle">
+              <div class="comunryright">
+                <span>出库计划</span>
+              </div>
+              <!-- <el-tag>{{ckjhData.ckjh}}台</el-tag> -->
+            </div>
+            <div class="navboxall" id="ckjhChart"></div>
+          </div>
+        </li>
+        <li style="width:28%">
+          <div class="boxall" style="height:50%">
+            <div class="companytitle">
+              <div class="comunryright">
+                <span>待拣货列表</span>
+              </div>
+            </div>
+            <div style="margin-top: 10px;">
+              <template>
+                <el-table :data="djhlbData" row-class-name="transparent" border style="height: 85%;margin-top: 10px;">
+                  <el-table-column prop="kh" label="客户" width="400">
+                  </el-table-column>
+                  <el-table-column prop="num" label="件数">
+                  </el-table-column>
+                </el-table>
+              </template>
+            </div>
+          </div>
+        </li>
+
+      </ul>
+      <ul class="clearfix">
+        <li>
+          <div class="boxall" style="height:35%;">
+            <div class="companytitle">
+              <div class="comunryright">
+                <span>正执行任务数</span>
+              </div>
+              <el-tag>{{zzxrwsData.zzxrws}}</el-tag>
+            </div>
+            <div class="navboxall" id="zzxrwsChart">
+            </div>
+          </div>
+        </li>
+
+        <li style="width:30%">
+          <div class="boxall" style="height:35%">
+            <div class="companytitle">
+              <div class="comunryright">
+                <span>任务统计</span>
+              </div>
+              <el-tag>{{rwtjData.rwtj}}托</el-tag>
+            </div>
+            <div class="navboxall" id="rwtjChart"></div>
+          </div>
+        </li>
+        <li style="width:40%">
+          <div class="boxall" style="height:35%">
+            <div class="companytitle">
+              <div class="comunryright">
+                <span>毛坯库一周运营看板</span>
+              </div>
+              <el-tag>{{yykbData.tmy}}托/月</el-tag>
+              <el-tag>{{yykbData.jsmy}}件/月</el-tag>
+            </div>
+            <div class="navboxall" id="yykbChart"></div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</body>
+<script>
+  var vueObject = new Vue({
+    el: '#app',
+    data: function () {
+      return {
+        width: 1920,
+        height: 1080,
+        //url: 'http://10.11.0.101:8003',
+        url: 'http://10.11.0.20:8088/dev-api',
+        interval: 600,
+        djhlbData: [],
+        params: {
+          yfjs: '',
+          yfpjs: '',
+          yjhjs: '',
+          djhtps: '',
+          dsjs: '',
+          jlrs: '',
+          fhwgl: '',
+          uph: '',
+          hwksys: '',
+        },
+        zzxrwsData: {
+          zzxrws: '',
+          title: ['立体库', 'A区', 'B区', 'C区', 'D区'],
+          data: ['', '', '', '', '']
+        },
+        ckjhData: {
+          ckjh: 118,
+          title: ['', '', '', ''],
+          ckts: ['', '', '', ''],
+          yfts: ['', '', '', ''],
+        },
+        rwtjData: {
+          rwtj: '',
+          title: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+          value: ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+        },
+        yykbData: {
+          tmy: '',
+          jsmy: '',
+          legend: ['出库件数'],
+          title: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+          value: ['', '', '', '', '', '', '']
+        }
+      }
+    },
+    mounted() {
+      window.addEventListener('resize', this.setScreenCompatibility());
+      this.zzxrwsChart();
+      this.rwtjChart();
+      this.ckjhChart();
+      this.yykbChart();
+      this.getData();
+    },
+    created() {
+      setInterval(this.getData, this.interval * 1000);
+    },
+    methods: {
+      setScreenCompatibility() {
+        // 计算屏幕实际分辨率宽高比例为 R
+        const R = window.innerWidth / window.innerHeight;
+        // 计算设计稿分辨率宽度与屏幕实际分辨率宽度比 Rw
+        const Rw = this.width / window.innerWidth;
+        // 计算设计稿分辨率高度与屏幕实际分辨率高度比 为 Rh
+        const Rh = this.height / window.innerHeight;
+        let width = this.width;
+        let height = (this.width / R);
+        let scale = 1 / Rw;
+        if (Rw < Rh) {
+          width = (this.height * R);
+          height = this.height;
+          scale = 1 / Rh;
+        }
+        // 设置body拉伸（尺寸）
+        document.body.style.width = width + "px";
+        document.body.style.height = height + "px";
+        // 设置body缩放
+        document.body.style.transform = `scale(${scale})`;
+        document.body.style.transformOrigin = '0 0';
+        document.body.style.MozTransform = `scale(${scale})`;
+        document.body.style.MozTransformOrigin = '0 0';
+      },
+      getData() {
+        const that = this;
+        Vue.http.get(that.url + "/gateway/mpkkb")
+          .then((result) => {
+            let res = result.data[0];
+            this.fillParams(res);
+            this.updateChart();
+          })
+          .catch((error) => {
+            if (!error.url) {
+              return;
+            }
+            if (error.status === 0 || error.status === -1) {
+              this.$message.warning("请求参数错误");
+            } else {
+              this.$message.warning("服务器异常");
+            }
+          });
+      },
+      yykbWeek(i, v) {
+        switch (v) {
+          case "1":
+            this.yykbData.title[i] = '周一';
+            break;
+          case "2":
+            this.yykbData.title[i] = '周二';
+            break;
+          case "3":
+            this.yykbData.title[i] = '周三';
+            break;
+          case "4":
+            this.yykbData.title[i] = '周四';
+            break;
+          case "5":
+            this.yykbData.title[i] = '周五';
+            break;
+          case "6":
+            this.yykbData.title[i] = '周六';
+            break;
+          case "0":
+            this.yykbData.title[i] = '周日';
+            break;
+          default:
+            console.log("日期有误");
+        }
+      },
+      fillParams(data) {
+        console.log(data);
+        this.params.yfjs = data.yfjs;
+        this.params.yfpjs = data.yfpjs;
+        this.params.yjhjs = data.yjhjs;
+        this.params.djhtps = data.djhjs;
+        this.params.dsjs = data.dsjs;
+        this.params.jlrs = data.jlrs;
+        this.params.fhwgl = (data.yjhjs / data.yfjs * 100).toFixed(0);
+        this.params.uph = data.uph;
+        this.params.hwksys = '';
+        this.yykbWeek(0, data.day1);
+        this.yykbWeek(1, data.day2);
+        this.yykbWeek(2, data.day3);
+        this.yykbWeek(3, data.day4);
+        this.yykbWeek(4, data.day5);
+        this.yykbWeek(5, data.day6);
+        this.yykbWeek(6, data.day7);
+        this.yykbData.value[0] = data.yykb1;
+        this.yykbData.value[1] = data.yykb2;
+        this.yykbData.value[2] = data.yykb3;
+        this.yykbData.value[3] = data.yykb4;
+        this.yykbData.value[4] = data.yykb5;
+        this.yykbData.value[5] = data.yykb6;
+        this.yykbData.value[6] = data.yykb7;
+        this.yykbData.tmy = data.cktmy,
+        this.yykbData.jsmy = data.ckjsmy,
+        this.rwtjData.rwtj = data.jhszs;
+        this.rwtjData.title[0] = data.hour1;
+        this.rwtjData.title[1] = data.hour2;
+        this.rwtjData.title[2] = data.hour3;
+        this.rwtjData.title[3] = data.hour4;
+        this.rwtjData.title[4] = data.hour5;
+        this.rwtjData.title[5] = data.hour6;
+        this.rwtjData.title[6] = data.hour7;
+        this.rwtjData.title[7] = data.hour8;
+        this.rwtjData.title[8] = data.hour9;
+        this.rwtjData.title[9] = data.hour10;
+        this.rwtjData.title[10] = data.hour11;
+        this.rwtjData.title[11] = data.hour12;
+        this.rwtjData.title[12] = data.hour13;
+        this.rwtjData.title[13] = data.hour14;
+        this.rwtjData.title[14] = data.hour15;
+        this.rwtjData.title[15] = data.hour16;
+        this.rwtjData.title[16] = data.hour17;
+        this.rwtjData.title[17] = data.hour18;
+        this.rwtjData.title[18] = data.hour19;
+        this.rwtjData.title[19] = data.hour20;
+        this.rwtjData.title[20] = data.hour21;
+        this.rwtjData.title[21] = data.hour22;
+        this.rwtjData.title[22] = data.hour23;
+        this.rwtjData.title[23] = data.hour24;
+        this.rwtjData.value[0] = data.jhs1;
+        this.rwtjData.value[1] = data.jhs2;
+        this.rwtjData.value[2] = data.jhs3;
+        this.rwtjData.value[3] = data.jhs4;
+        this.rwtjData.value[4] = data.jhs5;
+        this.rwtjData.value[5] = data.jhs6;
+        this.rwtjData.value[6] = data.jhs7;
+        this.rwtjData.value[7] = data.jhs8;
+        this.rwtjData.value[8] = data.jhs9;
+        this.rwtjData.value[9] = data.jhs10;
+        this.rwtjData.value[10] = data.jhs11;
+        this.rwtjData.value[11] = data.jhs12;
+        this.rwtjData.value[12] = data.jhs13;
+        this.rwtjData.value[13] = data.jhs14;
+        this.rwtjData.value[14] = data.jhs15;
+        this.rwtjData.value[15] = data.jhs16;
+        this.rwtjData.value[16] = data.jhs17;
+        this.rwtjData.value[17] = data.jhs18;
+        this.rwtjData.value[18] = data.jhs19;
+        this.rwtjData.value[19] = data.jhs20;
+        this.rwtjData.value[20] = data.jhs21;
+        this.rwtjData.value[21] = data.jhs22;
+        this.rwtjData.value[22] = data.jhs23;
+        this.rwtjData.value[23] = data.jhs24;
+        this.zzxrwsData.data[0] = data.rwltk;
+        this.zzxrwsData.data[1] = data.rwa;
+        this.zzxrwsData.data[2] = data.rwb;
+        this.zzxrwsData.data[3] = data.rwc;
+        this.zzxrwsData.data[4] = data.rwd;
+        this.zzxrwsData.zzxrws = data.rwltk + data.rwa + data.rwb + data.rwc + data.rwd;
+        this.khNum(data.kh1, data.khnum1);
+        this.khNum(data.kh2, data.khnum2);
+        this.khNum(data.kh3, data.khnum3);
+        this.khNum(data.kh4, data.khnum4);
+        this.khNum(data.kh5, data.khnum5);
+        this.khNum(data.kh6, data.khnum6);
+        this.khNum(data.kh7, data.khnum7);
+        this.khNum(data.kh8, data.khnum8);
+        this.ckjhData.title[0] = data.gys1;
+        this.ckjhData.title[1] = data.gys2;
+        this.ckjhData.title[2] = data.gys3;
+        this.ckjhData.title[3] = data.gys4;
+        this.ckjhData.ckts[0] = data.ckjs1;
+        this.ckjhData.ckts[1] = data.ckjs2;
+        this.ckjhData.ckts[2] = data.ckjs3;
+        this.ckjhData.ckts[3] = data.ckjs4;
+        this.ckjhData.yfts[0] = data.yfjs1;
+        this.ckjhData.yfts[1] = data.yfjs2;
+        this.ckjhData.yfts[2] = data.yfjs3;
+        this.ckjhData.yfts[3] = data.yfjs4;
+      },
+      khNum(kh, num) {
+        this.djhlbData = [];
+        if (kh != null) {
+          let khOBJ = {
+            kh: kh,
+            num: num
+          }       
+          this.djhlbData.push(khOBJ);
+        }
+
+      },
+      updateChart() {
+        var zzxrwsChart = echarts.init(document.getElementById('zzxrwsChart'));
+        var ckjhChart = echarts.init(document.getElementById('ckjhChart'));
+        var rwtjChart = echarts.init(document.getElementById('rwtjChart'));
+        var yykbChart = echarts.init(document.getElementById('yykbChart'));
+        rwtjChart.setOption({
+          xAxis: [{
+            data: this.rwtjData.title
+          }],
+          series: [{
+            data: this.rwtjData.value
+          }]
+        });
+        zzxrwsChart.setOption({
+          series: [{
+            data: this.zzxrwsData.data
+          },]
+        });
+        yykbChart.setOption({
+          xAxis: [{
+            data: this.yykbData.title,
+          }],
+          series: [{
+            name: this.yykbData.legend[0],
+            data: this.yykbData.value,
+          }]
+        });
+        ckjhChart.setOption({
+          xAxis: [{
+            data: this.ckjhData.title,
+          }],
+          series: [{
+            data: this.ckjhData.ckts,
+          }, {
+            data: this.ckjhData.yfts,
+          },
+          ]
+        });
+      },
+      zzxrwsChart() {
+        // 基于准备好的dom，初始化echarts实例
+        var myChart = echarts.init(document.getElementById('zzxrwsChart'));
+        var data = this.zzxrwsData.data;
+        var title = this.zzxrwsData.title;
+        // var data = [683, 234, 234, 523]
+        // var titlename = ['北京', '上海', '广州', '郑州'];
+        option = {
+          grid: {
+            left: '0',
+            top: '0',
+            right: '0',
+            bottom: '0%',
+            containLabel: true
+          },
+          xAxis: {
+            show: false
+          },
+          yAxis: [{
+            show: true,
+            data: title,
+            inverse: true,
+            axisLine: { show: false },
+            splitLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: {
+              textStyle: {
+                color: '#fff'
+              },
+            },
+
+          }, {
+            show: false,
+            inverse: true,
+            data: data,
+            axisLabel: { textStyle: { color: '#fff' } },
+            axisLine: { show: false },
+            splitLine: { show: false },
+            axisTick: { show: false },
+          }],
+          series: [{
+            name: '条',
+            type: 'bar',
+            yAxisIndex: 0,
+            data: data,
+            barWidth: 15,
+            itemStyle: {
+              normal: {
+                barBorderRadius: 50,
+                color: '#1089E7',
+              }
+            },
+            label: {
+              normal: {
+                show: true,
+                position: 'right',
+                formatter: '{c}',
+                textStyle: { color: 'rgba(255,255,255,.5)' }
+              }
+            },
+          }]
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+        window.addEventListener("resize", function () {
+          myChart.resize();
+        });
+      },
+      rwtjChart() {
+        /*   */
+        // 基于准备好的dom，初始化echarts实例
+        var myChart = echarts.init(document.getElementById('rwtjChart'));
+
+        option = {
+          legend: {
+            icon: "circle",
+            top: "0",
+            width: '100%',
+            right: 'center',
+            itemWidth: 10,
+            itemHeight: 10,
+            data: ['拣货数'],
+            textStyle: {
+              color: "#fff",
+              fontSize: '16',
+
+            },
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              lineStyle: {
+                color: '#dddc6b'
+              }
+            }
+          },
+          grid: {
+            left: '10',
+            top: '20',
+            right: '30',
+            bottom: '10',
+            containLabel: true
+          },
+          xAxis: [{
+            type: 'category',
+            boundaryGap: false,
+            axisLabel: {
+              textStyle: {
+                color: "rgba(255,255,255,.6)",
+                fontSize: 16,
+              },
+            },
+            axisLine: {
+              lineStyle: {
+                color: 'rgba(255,255,255,.1)'
+              }
+
+            },
+            data: this.rwtjData.title
+
+          }],
+
+          yAxis: [{
+            type: 'value',
+            axisTick: { show: false },
+            axisLine: {
+              lineStyle: {
+                color: 'rgba(255,255,255,.1)'
+              }
+            },
+            axisLabel: {
+              textStyle: {
+                color: "rgba(255,255,255,.6)",
+                fontSize: 16,
+              },
+            },
+
+            splitLine: {
+              lineStyle: {
+                color: 'rgba(255,255,255,.1)'
+              }
+            }
+          }],
+          series: [
+            {
+              name: '拣货数',
+              type: 'line',
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 5,
+              showSymbol: false,
+              lineStyle: {
+
+                normal: {
+                  color: '#dddc6b',
+                  width: 4
+                }
+              },
+              areaStyle: {
+                normal: {
+                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
+                    offset: 0,
+                    color: 'rgba(221, 220, 107, 0.4)'
+                  }, {
+                    offset: 0.8,
+                    color: 'rgba(221, 220, 107, 0.1)'
+                  }], false),
+                  shadowColor: 'rgba(0, 0, 0, 0.1)',
+                }
+              },
+              itemStyle: {
+                normal: {
+                  color: '#dddc6b',
+                  borderColor: 'rgba(221, 220, 107, .1)',
+                  borderWidth: 12
+                }
+              },
+              label: {
+                show: true,
+                position: 'top',
+                formatter: '{c}'
+              },
+              data: this.rwtjData.value
+
+            },
+
+          ]
+
+        };
+
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+        window.addEventListener("resize", function () {
+          myChart.resize();
+        });
+      },
+      ckjhChart() {
+        // 基于准备好的dom，初始化echarts实例
+        var myChart = echarts.init(document.getElementById('ckjhChart'));
+        var option = {
+
+
+
+
+          grid: {
+            left: '0',
+            top: '30',
+            right: '0',
+            bottom: '10',
+            containLabel: true
+          },
+          legend: {
+
+            top: 0,
+
+            textStyle: {
+
+              color: "#fff",
+
+            },
+
+            itemWidth: 10,  // 设置宽度
+
+            itemHeight: 10, // 设置高度
+
+          },
+
+          tooltip: {
+
+            trigger: 'axis',
+
+            axisPointer: { // 坐标轴指示器，坐标轴触发有效
+
+              type: 'shadow' // 默认为直线，可选为：'line' | 'shadow'
+
+            }
+
+          },
+
+          xAxis: {
+
+            type: 'category',
+
+            data: this.ckjhData.title,
+
+            axisTick: { //---坐标轴 刻度
+
+              show: true, //---是否显示
+
+            },
+
+            axisLine: { //---坐标轴 轴线
+
+              show: true, //---是否显示
+
+              lineStyle: {
+
+                color: 'rgba(255,255,255,.1)',
+
+                width: 1,
+
+                type: 'dotted',
+
+              },
+
+            },
+
+            axisLabel: {//X轴文字
+
+              textStyle: {
+
+                fontSize: 12,
+
+                color: '#fff'
+
+              },
+
+            },
+
+          },
+
+          yAxis: {
+
+            type: 'value',
+
+            splitLine: {//分割线
+
+              show: true,
+
+              lineStyle: {
+                color: 'rgba(255,255,255,.1)',
+
+                width: 1,
+                type: 'dotted'
+
+              }
+
+            },
+
+            axisLabel: {//Y轴刻度值
+
+              formatter: '{value}',
+
+              textStyle: {
+
+                fontSize: 12,
+
+                color: '#fff'
+
+              },
+
+            },
+
+            axisLine: { //---坐标轴 轴线
+
+              show: false, //---是否显示
+
+            },
+
+          },
+
+          series: [{
+
+            name: '应发件数',
+
+            type: 'bar',
+
+            data: this.ckjhData.ckts,
+
+            barWidth: 15,
+
+            barGap: 1, //柱子之间间距 //柱图宽度      两种情况都要设置，设置series 中对应数据柱形的itemStyle属性下的emphasis和normal的barBorderRadius属性初始化时候圆角  鼠标移上去圆角
+
+            itemStyle: {
+
+              normal: {
+                barBorderRadius: 50,
+                color: "#446ACF",
+
+              }
+
+            },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: '{c}'
+            }
+
+          }, {
+
+            name: '已发件数',
+
+            type: 'bar',
+
+            data: this.ckjhData.yfts,
+
+            barWidth: 15, //柱图宽度
+
+            barGap: 1,
+
+            itemStyle: {
+
+              normal: { //设置颜色的渐变
+                barBorderRadius: 50,
+                color: "#4fb69d",
+
+              }
+
+            },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: '{c}'
+            }
+
+          }]
+
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+        window.addEventListener("resize", function () {
+          myChart.resize();
+        });
+      },
+      yykbChart() {
+        // 基于准备好的dom，初始化echarts实例
+        var myChart = echarts.init(document.getElementById('yykbChart'));
+        option = {
+          //  backgroundColor: '#00265f',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          legend: {
+            data: this.yykbData.legend,
+            align: 'left',
+            // right: '0%',
+            top: '0%',
+            textStyle: {
+              color: "#fff",
+              fontSize: '16',
+
+            },
+
+            itemGap: 35
+          },
+          grid: {
+            left: '0%',
+            top: '40px',
+            right: '0%',
+            bottom: '2%',
+            containLabel: true
+          },
+          xAxis: [{
+            type: 'category',
+            data: this.yykbData.title,
+            axisLine: {
+              show: true,
+              lineStyle: {
+                color: "rgba(255,255,255,.1)",
+                width: 1,
+                type: "solid"
+              },
+            },
+            axisTick: {
+              show: false,
+            },
+            axisLabel: {
+              interval: 0,
+              // rotate:50,
+              show: true,
+              splitNumber: 15,
+              textStyle: {
+                color: "rgba(255,255,255,.6)",
+                fontSize: '16',
+              },
+            },
+          }],
+          yAxis: [{
+            type: 'value',
+            axisLabel: {
+              //formatter: '{value} %'
+              show: true,
+              textStyle: {
+                color: "rgba(255,255,255,.6)",
+                fontSize: '16',
+              },
+            },
+            axisTick: {
+              show: false,
+            },
+            axisLine: {
+              show: true,
+              lineStyle: {
+                color: "rgba(255,255,255,.1	)",
+                width: 1,
+                type: "solid"
+              },
+            },
+            splitLine: {
+              lineStyle: {
+                color: "rgba(255,255,255,.1)",
+              }
+            }
+          }],
+          series: [{
+            name: this.yykbData.legend[0],
+            type: 'line',
+
+            data: this.yykbData.value,
+
+            itemStyle: {
+              normal: {
+                color: '#2f89cf',
+                opacity: 1,
+
+                barBorderRadius: 5,
+              }
+            },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: '{c}'
+            }
+          }
+          ]
+        };
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+        window.addEventListener("resize", function () {
+          myChart.resize();
+        });
+      }
+
+    },
+
+  })
+
+</script>
+<script>
+  var t = null;
+  t = setTimeout(time, 1000);//開始运行
+  function time() {
+    clearTimeout(t);//清除定时器
+    dt = new Date();
+    var y = dt.getFullYear();
+    var mt = dt.getMonth() + 1;
+    var day = dt.getDate();
+    var h = dt.getHours();//获取时
+    var m = dt.getMinutes();//获取分
+    var s = dt.getSeconds();//获取秒
+    document.getElementById("showTime").innerHTML = y + "年" + mt + "月" + day + "日" + h + "时" + m + "分" + s + "秒";
+    t = setTimeout(time, 1000); //设定定时器，循环运行
+  }
+</script>
+
+</html>

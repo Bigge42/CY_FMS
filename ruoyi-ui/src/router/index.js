@@ -1,10 +1,7 @@
-import Vue from 'vue'
-import Router from 'vue-router'
-
-Vue.use(Router)
-
+import { createWebHistory, createRouter } from 'vue-router'
 /* Layout */
 import Layout from '@/layout'
+
 
 /**
  * Note: 路由配置项
@@ -22,7 +19,7 @@ import Layout from '@/layout'
  * meta : {
     noCache: true                   // 如果设置为true，则不会被 <keep-alive> 缓存(默认 false)
     title: 'title'                  // 设置该路由在侧边栏和面包屑中展示的名字
-    icon: 'svg-name'                // 设置该路由的图标，对应路径src/assets/icons/svg
+    icon: 'svg-name'                // 设置该路由的图标，对应路径src/assets/icons/svg 
     breadcrumb: false               // 如果设置为false，则不会在breadcrumb面包屑中显示
     activeMenu: '/system/user'      // 当路由设置了该属性，则会高亮相对应的侧边栏。
   }
@@ -30,26 +27,119 @@ import Layout from '@/layout'
 
 // 公共路由
 export const constantRoutes = [
-  // 新增路由
-    {
-      path: '/visualboard',  // 设置访问路径为 /visualboard
-      component: () => import('@/views/visualboard/ZzcjDashboard.vue'),
-      hidden: true,
-      meta: { title: '数字大屏', icon: 'dashboard' }
-
+  {
+    path: '/file',
+    hidden: true,
+    name:'fileInfo',
+    component: () => import('@/views/filems/files/index.vue'),
+    meta: { title: '文件管理', icon: 'dashboard'}
+  },
+  {
+    path: '/folder',
+    hidden: true,
+    name:'folderInfo',
+    component: () => import('@/views/filems/folders/index.vue'),
+    meta: { title: '文件夹管理', icon: 'dashboard'}
+  },
+  {
+    path: '/documentUpload',
+    name:'UploadPage',
+    component: () => import('@/views/fms/DocumentUploadPage.vue'),
+    meta: { title: '上传页面', icon: 'dashboard'}
     },
-    {
-      path: '/myPage',
-      component: Layout,  // 使用 Layout 组件，这样页面会显示在主布局中
-      children: [
-        {
-          path: '',
-          component: () => import('@/views/myPage/index.vue'),
-          name: 'MyPage',
-          meta: { title: '我的页面', icon: 'link' }  // 可以根据需要配置侧边栏名称和图标
+  {
+    path: '/kanban',
+    name: 'kanban',
+    component: Layout, // 使用与其他页面相同的布局组件
+    hidden: true,
+    children: [
+      {
+        path: 'ltk',
+        name: 'LtkKanbanPage',
+        component: () => import('@/views/boardviews/LtkKanban.vue'),
+        meta: {
+          title: '立体库看板',
+          icon: 'monitor',
+          noCache: false
         }
-      ]
-    },
+      },
+      {
+        path: 'mpk',
+        name: 'MpkKanbanPage',
+        component: () => import('@/views/boardviews/MpkKanban.vue'),
+        meta: {
+          title: '毛坯库看板',
+          icon: 'monitor',
+          noCache: false
+        }
+      },{
+        path: 'zzcj',
+        name: 'ZzcjKanban',
+        component: () => import('@/views/visualboard/ZzcjDashboardT.vue'),
+        meta: { title: '直通阀车间大屏', icon: 'dashboard' }
+      },
+      {
+        path: 'xzf',
+        name: 'XzfKanban',
+        component: () => import('@/views/visualboard/XzfDashboardT.vue'),
+        meta: { title: '旋转阀装配大屏', icon: 'dashboard' }
+      },
+      {
+        path: 'ztf',
+        name: 'ZtfKanban',
+        component: () => import('@/views/visualboard/ZtfDashboardT.vue'),
+        meta: { title: '直通阀装配大屏', icon: 'dashboard' }
+      },
+      {
+        path: 'xzfys',
+        name: 'XzfysKanban',
+        component: () => import('@/views/visualboard/XzfysDashboardT.vue'),
+        meta: { title: '旋转阀压水车间大屏', icon: 'dashboard' }
+      }
+    ]
+  },
+  {
+    path: '/visualboard/ltkkb',
+    hidden: true,
+    component: () => window.open('/立体库看板/立体库看板.html', '_self'),
+    meta: { title: '立体库看板', icon: 'dashboard' }
+  },
+  {
+    path: '/visualboard/mpkkb',
+    hidden: true,
+    component: () => window.open('/毛坯库看板/毛坯库看板.html', '_self'),
+    meta: { title: '毛坯库看板', icon: 'dashboard' }
+  },
+  {
+    path: '/visualboard/zzcj',
+    component: () => import('@/views/visualboard/ZzcjDashboard.vue'),
+    hidden: true,
+    meta: { title: '直通阀车间大屏', icon: 'dashboard' },
+  },
+  {
+    path: '/visualboard/qfcj',
+    component: () => import('@/views/visualboard/QfDashboard.vue'),
+    hidden: true,
+    meta: { title: '球阀车间大屏', icon: 'dashboard' },
+  },
+  {
+    path: '/visualboard/xzf',  // 更新访问路径为 /visualboard/xzf
+    component: () => import('@/views/visualboard/XzfDashboard.vue'),
+    hidden: true,
+    meta: { title: '旋转阀装配大屏', icon: 'dashboard' },
+  },
+  {
+    path: '/visualboard/ztf',  // 更新访问路径为 /visualboard/ztf
+    component: () => import('@/views/visualboard/ZtfDashboard.vue'),
+    hidden: true,
+    meta: { title: '直通阀装配大屏', icon: 'dashboard' },
+  },
+  {
+    path: '/visualboard/xzfys',  // 更新访问路径为 /visualboard/xzfys
+    component: () => import('@/views/visualboard/XzfysDashboard.vue'),
+    hidden: true,
+    meta: { title: '旋转阀压水车间大屏', icon: 'dashboard' },
+  },
   {
     path: '/redirect',
     component: Layout,
@@ -57,7 +147,7 @@ export const constantRoutes = [
     children: [
       {
         path: '/redirect/:path(.*)',
-        component: () => import('@/views/redirect')
+        component: () => import('@/views/redirect/index.vue')
       }
     ]
   },
@@ -72,7 +162,7 @@ export const constantRoutes = [
     hidden: true
   },
   {
-    path: '/404',
+    path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),
     hidden: true
   },
@@ -84,10 +174,10 @@ export const constantRoutes = [
   {
     path: '',
     component: Layout,
-    redirect: 'index',
+    redirect: '/index',
     children: [
       {
-        path: 'index',
+        path: '/index',
         component: () => import('@/views/index'),
         name: 'Index',
         meta: { title: '首页', icon: 'dashboard', affix: true }
@@ -184,20 +274,16 @@ export const dynamicRoutes = [
   }
 ]
 
-// 防止连续点击多次路由报错
-let routerPush = Router.prototype.push;
-let routerReplace = Router.prototype.replace;
-// push
-Router.prototype.push = function push(location) {
-  return routerPush.call(this, location).catch(err => err)
-}
-// replace
-Router.prototype.replace = function push(location) {
-  return routerReplace.call(this, location).catch(err => err)
-}
+const router = createRouter({
+  history: createWebHistory(),
+  routes: constantRoutes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    } else {
+      return { top: 0 }
+    }
+  },
+});
 
-export default new Router({
-  mode: 'history', // 去掉url中的#
-  scrollBehavior: () => ({ y: 0 }),
-  routes: constantRoutes
-})
+export default router;
