@@ -15,6 +15,13 @@ ruoyi:
   # 免登录路径配置
   anonUrls: /login, /logout, /captchaImage, /myPage  # 添加您的自定义页面路径 '/myPage'
 
+# FTP配置
+ftp:
+  host: 127.0.0.1
+  port: 21
+  username: SICCV
+  password: 970308
+  remote-dir: /ftp/uploads
 
 # 开发环境配置
 server:
