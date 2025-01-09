@@ -17,13 +17,13 @@ ruoyi:
 # 代码生成
 gen:
   # 开发者姓名，生成到类注释上
-  author: 王梓
+  author: wz
   # 默认生成包路径 system 需改成自己的模块名称 如 system monitor tool
-  packageName: com.ruoyi.cylabel
+  packageName: com.ruoyi.cyfms
   # 自动去除表前缀，默认是false
   autoRemovePre: false
   # 表前缀（生成类名不会包含表前缀，多个用逗号分隔）
-  tablePrefix: label_
+  tablePrefix: cy_
 
 # FTP配置
 ftp:
@@ -32,6 +32,7 @@ ftp:
   username: SICCV
   password: 970308
   remote-dir: /ftp/uploads
+
 
 # 开发环境配置
 server:

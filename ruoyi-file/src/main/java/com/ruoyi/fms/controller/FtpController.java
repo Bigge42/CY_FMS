@@ -2,6 +2,7 @@ package com.ruoyi.fms.controller;
 
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.fms.service.FtpService;
+import com.ruoyi.fms.service.FileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,22 +24,26 @@ public class FtpController {
     @Autowired
     private FtpService ftpService;
 
+    @Autowired
+    private FileService fileService;
+
     /**
      * 文件上传接口
      *
-     * @param file 上传的文件
+     * @param file       上传的文件
+     * @param folderCode 文件夹编码
      * @return 上传结果
      */
     @Anonymous
     @PostMapping("/upload")
-    public Response uploadFile(@RequestParam("file") MultipartFile file) {
+    public Response uploadFile(@RequestParam("file") MultipartFile file,
+                               @RequestParam("folderCode") String folderCode) {
         String localFilePath = TEMP_DIR + file.getOriginalFilename();
         try {
             // 创建临时目录（如果不存在）
             File tempDir = new File(TEMP_DIR);
             if (!tempDir.exists()) {
-                boolean created = tempDir.mkdirs();
-                log.info("创建临时目录: {}", created ? "成功" : "失败");
+                tempDir.mkdirs();
             }
 
             // 保存文件到本地
@@ -49,12 +54,20 @@ public class FtpController {
             ftpService.uploadFile(localFilePath, file.getOriginalFilename());
             log.info("文件成功上传到 FTP: {}", file.getOriginalFilename());
 
-            // 清理临时文件
-            new File(localFilePath).delete();
-            log.info("本地临时文件已清理: {}", localFilePath);
+            // 插入文件记录到数据库
+            fileService.saveFileRecord(file.getOriginalFilename(), localFilePath, folderCode);
+            log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}", file.getOriginalFilename(), folderCode);
 
-            return Response.success("文件上传成功");
-        } catch (IOException e) {
+            // 清理本地临时文件
+            boolean deleted = new File(localFilePath).delete();
+            if (deleted) {
+                log.info("本地临时文件已删除: {}", localFilePath);
+            } else {
+                log.warn("本地临时文件删除失败: {}", localFilePath);
+            }
+
+            return Response.success("文件上传成功并已存储到数据库");
+        } catch (Exception e) {
             log.error("文件上传失败: {}", e.getMessage(), e);
             return Response.error("文件上传失败: " + e.getMessage());
         }
@@ -79,6 +92,27 @@ public class FtpController {
         } catch (IOException e) {
             log.error("文件下载失败: {}", e.getMessage(), e);
             return Response.error("文件下载失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除文件接口
+     *
+     * @param fileName 文件名
+     * @return 删除结果
+     */
+    @Anonymous
+    @DeleteMapping("/delete")
+    public Response deleteFile(@RequestParam String fileName) {
+        try {
+            // 删除 FTP 文件
+            ftpService.deleteFile(fileName);
+            log.info("文件成功从 FTP 删除: {}", fileName);
+
+            return Response.success("文件删除成功");
+        } catch (Exception e) {
+            log.error("文件删除失败: {}", e.getMessage(), e);
+            return Response.error("文件删除失败: " + e.getMessage());
         }
     }
 
