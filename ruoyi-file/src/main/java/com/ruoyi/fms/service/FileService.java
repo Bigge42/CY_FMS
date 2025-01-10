@@ -1,49 +1,44 @@
 package com.ruoyi.fms.service;
 
 import com.ruoyi.fms.domain.CYFile;
-import com.ruoyi.fms.domain.CYFolder;
-import com.ruoyi.fms.mapper.FileMapper;
-import com.ruoyi.fms.mapper.FolderMapper;
+import com.ruoyi.fms.mapper.CYFileMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Random;
 
 @Service
 public class FileService {
 
     @Autowired
-    private FileMapper fileMapper;
+    private CYFileMapper fileMapper;
 
-    @Autowired
-    private FolderMapper folderMapper;
+    /**
+     * 保存文件记录到数据库
+     *
+     * @param file CYFile 对象
+     * @return 插入结果
+     */
+    public int saveFileRecord(CYFile file) {
+        return fileMapper.insertFile(file);
+    }
 
-    @Transactional
-    public void saveFileRecord(String fileName, String localFilePath, String folderCode) {
-        // 检查文件夹是否存在
-        CYFolder folder = folderMapper.findByFolderCode(folderCode);
-        if (folder == null) {
-            // 如果文件夹不存在，动态创建
-            folder = new CYFolder();
-            folder.setFolderCode(folderCode);
-            folder.setFolderName("默认文件夹");
-            folder.setCreatedBy("system");
-            folderMapper.insertFolder(folder);
-        }
+    /**
+     * 根据文件名和 MatchID 查找文件
+     *
+     * @param fileName 文件名
+     * @param matchID  匹配ID
+     * @return CYFile 对象
+     */
+    public CYFile findFileByNameAndMatchID(String fileName, Integer matchID) {
+        return fileMapper.findByFileNameAndMatchID(fileName, matchID);
+    }
 
-        // 构建文件记录
-        CYFile fileRecord = new CYFile();
-        fileRecord.setFileName(fileName);
-        fileRecord.setFolderID(folder.getFolderID());
-        fileRecord.setDocumentTypeName("未分类"); // 默认文档类型
-        fileRecord.setVersionNumber("1.0");
-        fileRecord.setCreatedBy("system");
-        fileRecord.setFileURL(localFilePath);
-
-        // 插入文件记录到数据库
-        fileMapper.insertFile(fileRecord);
+    /**
+     * 标记文件为已删除
+     *
+     * @param fileID 文件ID
+     * @return 更新结果
+     */
+    public int markFileAsDeleted(Integer fileID) {
+        return fileMapper.markAsDeleted(fileID);
     }
 }
-
-

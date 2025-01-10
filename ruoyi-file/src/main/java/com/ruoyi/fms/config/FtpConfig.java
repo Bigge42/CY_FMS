@@ -1,19 +1,34 @@
 package com.ruoyi.fms.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+/**
+ * FtpConfig 加载 FTP 服务器的配置参数。
+ */
 @Component
-@ConfigurationProperties(prefix = "ftp")
 public class FtpConfig {
 
+    @Value("${ftp.host}")
     private String host;
+
+    @Value("${ftp.port}")
     private int port;
+
+    @Value("${ftp.username}")
     private String username;
+
+    @Value("${ftp.password}")
     private String password;
+
+    @Value("${ftp.remote-dir}")
     private String remoteDir;
 
-    // Getter 和 Setter 方法
+    @Value("${fms.temp.dir:C:/temp/}")
+    private String tempDir;
+
+    // Getters and Setters
+
     public String getHost() {
         return host;
     }
@@ -52,5 +67,13 @@ public class FtpConfig {
 
     public void setRemoteDir(String remoteDir) {
         this.remoteDir = remoteDir;
+    }
+
+    public String getTempDir() {
+        return tempDir;
+    }
+
+    public void setTempDir(String tempDir) {
+        this.tempDir = tempDir;
     }
 }

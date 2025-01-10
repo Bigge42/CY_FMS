@@ -31,9 +31,12 @@ ftp:
   port: 21
   username: SICCV
   password: 970308
-  remote-dir: /ftp/uploads
+  remote-dir: uploads
 
-
+# 临时目录配置
+  fms:
+    temp:
+        dir: C:/temp/
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080

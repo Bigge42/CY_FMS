@@ -1,8 +1,11 @@
 package com.ruoyi.fms.controller;
 
 import com.ruoyi.common.annotation.Anonymous;
-import com.ruoyi.fms.service.FtpService;
+import com.ruoyi.fms.domain.CYFile;
+import com.ruoyi.fms.domain.CYFolder;
 import com.ruoyi.fms.service.FileService;
+import com.ruoyi.fms.service.FolderService;
+import com.ruoyi.fms.service.FtpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +13,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 
 @RestController
 @RequestMapping("/fms/ftp")
@@ -18,45 +24,128 @@ public class FtpController {
 
     private static final Logger log = LoggerFactory.getLogger(FtpController.class);
 
-    // 临时目录常量
-    private static final String TEMP_DIR = "C:/temp/";
-
     @Autowired
     private FtpService ftpService;
 
     @Autowired
     private FileService fileService;
 
+    @Autowired
+    private FolderService folderService;
+
+    // 允许的文档类型
+    private static final List<String> ALLOWED_DOCUMENT_TYPES = Arrays.asList(
+            "材质理化报告",
+            "合格证",
+            "说明书",
+            "产品检验报告",
+            "装箱单",
+            "供应商原材料报告",
+            "abc"
+    );
+
     /**
      * 文件上传接口
      *
-     * @param file       上传的文件
-     * @param folderCode 文件夹编码
+     * @param file             上传的文件
+     * @param documentTypeName 文档类型名称
+     * @param matchID          匹配ID
      * @return 上传结果
      */
     @Anonymous
     @PostMapping("/upload")
     public Response uploadFile(@RequestParam("file") MultipartFile file,
-                               @RequestParam("folderCode") String folderCode) {
-        String localFilePath = TEMP_DIR + file.getOriginalFilename();
+                               @RequestParam("documentTypeName") String documentTypeName,
+                               @RequestParam("matchID") Integer matchID) {
+        // 验证文档类型
+        if (!ALLOWED_DOCUMENT_TYPES.contains(documentTypeName)) {
+            log.warn("不支持的文档类型: {}", documentTypeName);
+            return Response.error("不支持的文档类型: " + documentTypeName);
+        }
+
+        if (file.isEmpty()) {
+            log.warn("上传的文件为空");
+            return Response.error("上传的文件为空");
+        }
+
+        if (matchID == null) {
+            log.warn("MatchID 不能为空");
+            return Response.error("MatchID 不能为空");
+        }
+
+        // 生成时间戳
+        String timestamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+
+        // 原始文件名
+        String originalFileName = file.getOriginalFilename();
+        if (originalFileName == null) {
+            originalFileName = "unknown";
+        }
+
+        // 文件扩展名
+        String extension = "";
+        int dotIndex = originalFileName.lastIndexOf('.');
+        if (dotIndex != -1) {
+            extension = originalFileName.substring(dotIndex);
+            originalFileName = originalFileName.substring(0, dotIndex);
+        }
+
+        // 新文件名添加时间戳
+        String newFileName = originalFileName + "_" + timestamp + extension;
+
+        String localFilePath = ftpService.getTempDir() + newFileName;
         try {
             // 创建临时目录（如果不存在）
-            File tempDir = new File(TEMP_DIR);
-            if (!tempDir.exists()) {
-                tempDir.mkdirs();
+            File tempDirectory = new File(ftpService.getTempDir());
+            if (!tempDirectory.exists()) {
+                boolean dirsCreated = tempDirectory.mkdirs();
+                if (dirsCreated) {
+                    log.info("临时目录已创建: {}", ftpService.getTempDir());
+                } else {
+                    log.warn("无法创建临时目录: {}", ftpService.getTempDir());
+                    return Response.error("无法创建临时目录: " + ftpService.getTempDir());
+                }
             }
 
             // 保存文件到本地
             file.transferTo(new File(localFilePath));
             log.info("文件保存到本地临时路径: {}", localFilePath);
 
+            // 查找或创建文件夹
+            CYFolder folder = folderService.findOrCreateFolder(documentTypeName, "system"); // 可以根据实际情况替换创建者
+            String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
+
             // 上传文件到 FTP
-            ftpService.uploadFile(localFilePath, file.getOriginalFilename());
-            log.info("文件成功上传到 FTP: {}", file.getOriginalFilename());
+            boolean uploadResult = ftpService.uploadFile(localFilePath, remoteFolderPath, newFileName);
+            if (!uploadResult) {
+                log.error("文件上传到 FTP 失败: {}", newFileName);
+                return Response.error("文件上传到 FTP 失败");
+            }
+            log.info("文件成功上传到 FTP: {}", newFileName);
+
+            // 构建文件URL
+            String fileURL = ftpService.getFtpUrl(remoteFolderPath, newFileName);
+            if (fileURL == null) {
+                log.warn("构建文件 URL 失败");
+                return Response.error("构建文件 URL 失败");
+            }
 
             // 插入文件记录到数据库
-            fileService.saveFileRecord(file.getOriginalFilename(), localFilePath, folderCode);
-            log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}", file.getOriginalFilename(), folderCode);
+            CYFile cyFile = new CYFile();
+            cyFile.setFileName(originalFileName + extension);
+            cyFile.setFolderID(folder.getFolderID());
+            cyFile.setDocumentTypeName(documentTypeName);
+            cyFile.setMatchID(matchID);
+            cyFile.setVersionNumber(timestamp);
+            cyFile.setCreatedBy("system"); // 可以根据实际情况替换创建者
+            cyFile.setFileURL(fileURL);
+
+            int insertResult = fileService.saveFileRecord(cyFile);
+            if (insertResult <= 0) {
+                log.warn("数据库插入文件记录失败");
+                return Response.error("数据库插入文件记录失败");
+            }
+            log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}", cyFile.getFileName(), folder.getFolderCode());
 
             // 清理本地临时文件
             boolean deleted = new File(localFilePath).delete();
@@ -76,20 +165,43 @@ public class FtpController {
     /**
      * 文件下载接口
      *
-     * @param fileName 文件名
+     * @param fileName 文档类型名称和文件名（用于查找文件记录）
+     * @param matchID  匹配ID
      * @return 下载结果
      */
     @Anonymous
     @GetMapping("/download")
-    public Response downloadFile(@RequestParam String fileName) {
-        String localFilePath = TEMP_DIR + fileName;
+    public Response downloadFile(@RequestParam("fileName") String fileName,
+                                 @RequestParam("matchID") Integer matchID) {
         try {
-            // 从 FTP 下载文件
-            ftpService.downloadFile(fileName, localFilePath);
-            log.info("文件成功从 FTP 下载: {}", fileName);
+            // 根据文件名和 MatchID 查找文件记录
+            CYFile cyFile = fileService.findFileByNameAndMatchID(fileName, matchID);
+            if (cyFile == null) {
+                log.warn("未找到对应的文件记录: 文件名={}, MatchID={}", fileName, matchID);
+                return Response.error("未找到对应的文件记录");
+            }
+
+            // 获取文件夹信息
+            CYFolder folder = folderService.findFolderById(cyFile.getFolderID());
+            if (folder == null) {
+                log.warn("未找到对应的文件夹: FolderID={}", cyFile.getFolderID());
+                return Response.error("未找到对应的文件夹");
+            }
+
+            String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
+            String remoteFileName = cyFile.getFileName();
+
+            // 下载文件到临时目录
+            String localFilePath = ftpService.getTempDir() + remoteFileName;
+            boolean downloadResult = ftpService.downloadFile(remoteFolderPath, remoteFileName, localFilePath);
+            if (!downloadResult) {
+                log.error("文件下载失败: {}", remoteFileName);
+                return Response.error("文件下载失败");
+            }
+            log.info("文件成功从 FTP 下载: {}", remoteFileName);
 
             return Response.success("文件下载成功，保存到: " + localFilePath);
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("文件下载失败: {}", e.getMessage(), e);
             return Response.error("文件下载失败: " + e.getMessage());
         }
@@ -98,16 +210,47 @@ public class FtpController {
     /**
      * 删除文件接口
      *
-     * @param fileName 文件名
+     * @param fileName 文档类型名称和文件名（用于查找文件记录）
+     * @param matchID  匹配ID
      * @return 删除结果
      */
     @Anonymous
     @DeleteMapping("/delete")
-    public Response deleteFile(@RequestParam String fileName) {
+    public Response deleteFile(@RequestParam("fileName") String fileName,
+                               @RequestParam("matchID") Integer matchID) {
         try {
-            // 删除 FTP 文件
-            ftpService.deleteFile(fileName);
-            log.info("文件成功从 FTP 删除: {}", fileName);
+            // 根据文件名和 MatchID 查找文件记录
+            CYFile cyFile = fileService.findFileByNameAndMatchID(fileName, matchID);
+            if (cyFile == null) {
+                log.warn("未找到对应的文件记录: 文件名={}, MatchID={}", fileName, matchID);
+                return Response.error("未找到对应的文件记录");
+            }
+
+            // 获取文件夹信息
+            CYFolder folder = folderService.findFolderById(cyFile.getFolderID());
+            if (folder == null) {
+                log.warn("未找到对应的文件夹: FolderID={}", cyFile.getFolderID());
+                return Response.error("未找到对应的文件夹");
+            }
+
+            String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
+            String remoteFileName = cyFile.getFileName();
+
+            // 删除文件从 FTP
+            boolean deleteResult = ftpService.deleteFile(remoteFolderPath, remoteFileName);
+            if (!deleteResult) {
+                log.error("文件删除失败: {}", remoteFileName);
+                return Response.error("文件删除失败");
+            }
+            log.info("文件成功从 FTP 删除: {}", remoteFileName);
+
+            // 标记数据库记录为删除
+            int updateResult = fileService.markFileAsDeleted(cyFile.getFileID());
+            if (updateResult <= 0) {
+                log.warn("数据库标记文件记录为删除失败: FileID={}", cyFile.getFileID());
+                return Response.error("数据库标记文件记录为删除失败");
+            }
+            log.info("文件记录已标记为删除: FileID={}", cyFile.getFileID());
 
             return Response.success("文件删除成功");
         } catch (Exception e) {
