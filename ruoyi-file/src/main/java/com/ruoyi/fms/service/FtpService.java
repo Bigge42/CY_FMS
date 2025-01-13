@@ -93,6 +93,11 @@ public class FtpService {
                 boolean success = ftpClient.storeFile(remoteFileName, inputStream);
                 if (success) {
                     log.info("文件上传成功: {}/{}", remoteFolder, remoteFileName);
+                    // 如果上传成功，额外输出可下载链接
+                    String ftpUrl = getFtpUrl(remoteFolder, remoteFileName);
+                    if (ftpUrl != null) {
+                        log.info("可下载文件的 URL: {}", ftpUrl);
+                    }
                 } else {
                     log.error("文件上传失败: {}/{}. 回复码: {}, 回复信息: {}",
                             remoteFolder, remoteFileName, ftpClient.getReplyCode(), ftpClient.getReplyString());

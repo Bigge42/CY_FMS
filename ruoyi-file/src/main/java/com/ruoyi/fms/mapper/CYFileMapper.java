@@ -11,8 +11,8 @@ public interface CYFileMapper {
         @Options(useGeneratedKeys = true, keyProperty = "fileID")
         int insertFile(CYFile file);
 
-        @Select("SELECT * FROM CY_FILE WHERE fileName = #{fileName} AND matchID = #{matchID} AND deleteFlag = 0")
-        CYFile findByFileNameAndMatchID(@Param("fileName") String fileName, @Param("matchID") Integer matchID);
+        @Select("SELECT * FROM CY_FILE WHERE documentTypeName = #{documentTypeName} AND matchID = #{matchID} AND deleteFlag = 0")
+        CYFile findByFileNameAndMatchID(@Param("documentTypeName") String documentTypeName, @Param("matchID") Integer matchID);
 
         @Update("UPDATE CY_FILE SET deleteFlag = 1, updatedAt = NOW() WHERE fileID = #{fileID}")
         int markAsDeleted(@Param("fileID") Integer fileID);

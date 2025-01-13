@@ -24,12 +24,12 @@ public class FileService {
     /**
      * 根据文件名和 MatchID 查找文件
      *
-     * @param fileName 文件名
+     * @param documentTypeName 文件名
      * @param matchID  匹配ID
      * @return CYFile 对象
      */
-    public CYFile findFileByNameAndMatchID(String fileName, Integer matchID) {
-        return fileMapper.findByFileNameAndMatchID(fileName, matchID);
+    public CYFile findFileByNameAndMatchID(String documentTypeName, Integer matchID) {
+        return fileMapper.findByFileNameAndMatchID(documentTypeName, matchID);
     }
 
     /**

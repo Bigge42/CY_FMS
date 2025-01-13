@@ -155,7 +155,7 @@ public class FtpController {
                 log.warn("本地临时文件删除失败: {}", localFilePath);
             }
 
-            return Response.success("文件上传成功并已存储到数据库");
+            return Response.success("文件上传成功并已存储到数据库", fileURL);
         } catch (Exception e) {
             log.error("文件上传失败: {}", e.getMessage(), e);
             return Response.error("文件上传失败: " + e.getMessage());
@@ -165,19 +165,19 @@ public class FtpController {
     /**
      * 文件下载接口
      *
-     * @param fileName 文档类型名称和文件名（用于查找文件记录）
+     * @param documentTypeName 文档类型名称和文件名（用于查找文件记录）
      * @param matchID  匹配ID
      * @return 下载结果
      */
     @Anonymous
     @GetMapping("/download")
-    public Response downloadFile(@RequestParam("fileName") String fileName,
+    public Response downloadFile(@RequestParam("documentTypeName") String documentTypeName,
                                  @RequestParam("matchID") Integer matchID) {
         try {
             // 根据文件名和 MatchID 查找文件记录
-            CYFile cyFile = fileService.findFileByNameAndMatchID(fileName, matchID);
+            CYFile cyFile = fileService.findFileByNameAndMatchID(documentTypeName, matchID);
             if (cyFile == null) {
-                log.warn("未找到对应的文件记录: 文件名={}, MatchID={}", fileName, matchID);
+                log.warn("未找到对应的文件记录: 文件类型={}, MatchID={}", documentTypeName, matchID);
                 return Response.error("未找到对应的文件记录");
             }
 
@@ -265,12 +265,22 @@ public class FtpController {
     public static class Response {
         private int code;
         private String msg;
+        private String url;
 
         public Response(int code, String msg) {
             this.code = code;
             this.msg = msg;
         }
 
+        public Response(int code, String msg, String url) {
+            this.code = code;
+            this.msg = msg;
+            this.url = url;
+        }
+
+        public static Response success(String msg,String url) {
+            return new Response(200, msg,url);
+        }
         public static Response success(String msg) {
             return new Response(200, msg);
         }
@@ -293,6 +303,10 @@ public class FtpController {
 
         public void setMsg(String msg) {
             this.msg = msg;
+        }
+
+        public String getUrl() {
+            return url;
         }
     }
 }
