@@ -1,96 +1,119 @@
-<p align="center">
-	<img alt="logo" src="https://oscimg.oschina.net/oscnet/up-d3d0a9303e11d522a06cd263f3079027715.png">
-</p>
-<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">RuoYi v3.8.8</h1>
-<h4 align="center">基于SpringBoot+Vue前后端分离的Java快速开发框架</h4>
-<p align="center">
-	<a href="https://gitee.com/y_project/RuoYi-Vue/stargazers"><img src="https://gitee.com/y_project/RuoYi-Vue/badge/star.svg?theme=dark"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue"><img src="https://img.shields.io/badge/RuoYi-v3.8.8-brightgreen.svg"></a>
-	<a href="https://gitee.com/y_project/RuoYi-Vue/blob/master/LICENSE"><img src="https://img.shields.io/github/license/mashape/apistatus.svg"></a>
-</p>
+下面是一份在 Ruoyi 后台管理框架下进一步补充和完善的文件管理系统 README 示例文档，可根据实际项目需求进行调整：
 
-## 平台简介
+---
 
-若依是一套全部开源的快速开发平台，毫无保留给个人及企业免费使用。
+# 文件管理系统 README
 
-* 前端采用Vue、Element UI。
-* 后端采用Spring Boot、Spring Security、Redis & Jwt。
-* 权限认证使用Jwt，支持多终端认证系统。
-* 支持加载动态权限菜单，多方式轻松权限控制。
-* 高效率开发，使用代码生成器可以一键生成前后端代码。
-* 提供了技术栈（[Vue3](https://v3.cn.vuejs.org) [Element Plus](https://element-plus.org/zh-CN) [Vite](https://cn.vitejs.dev)）版本[RuoYi-Vue3](https://github.com/yangzongzhuan/RuoYi-Vue3)，保持同步更新。
-* 提供了单应用版本[RuoYi-Vue-fast](https://github.com/yangzongzhuan/RuoYi-Vue-fast)，Oracle版本[RuoYi-Vue-Oracle](https://github.com/yangzongzhuan/RuoYi-Vue-Oracle)，保持同步更新。
-* 不分离版本，请移步[RuoYi](https://gitee.com/y_project/RuoYi)，微服务版本，请移步[RuoYi-Cloud](https://gitee.com/y_project/RuoYi-Cloud)
-* 阿里云折扣场：[点我进入](http://aly.ruoyi.vip)，腾讯云秒杀场：[点我进入](http://txy.ruoyi.vip)&nbsp;&nbsp;
-* 阿里云优惠券：[点我领取](https://www.aliyun.com/minisite/goods?userCode=brki8iof&share_source=copy_link)，腾讯云优惠券：[点我领取](https://cloud.tencent.com/redirect.php?redirect=1025&cps_key=198c8df2ed259157187173bc7f4f32fd&from=console)&nbsp;&nbsp;
+本文件管理系统致力于为项目提供一套高效、可靠、灵活的文件操作解决方案。该系统基于 Ruoyi 后台管理框架进行开发，充分利用 Ruoyi 的权限、日志和模块化特性，实现文件的上传、下载、管理及审计等功能。
 
-## 内置功能
+## 功能概览
 
-1.  用户管理：用户是系统操作者，该功能主要完成系统用户配置。
-2.  部门管理：配置系统组织机构（公司、部门、小组），树结构展现支持数据权限。
-3.  岗位管理：配置系统用户所属担任职务。
-4.  菜单管理：配置系统菜单，操作权限，按钮权限标识等。
-5.  角色管理：角色菜单权限分配、设置角色按机构进行数据范围权限划分。
-6.  字典管理：对系统中经常使用的一些较为固定的数据进行维护。
-7.  参数管理：对系统动态配置常用参数。
-8.  通知公告：系统通知公告信息发布维护。
-9.  操作日志：系统正常操作日志记录和查询；系统异常信息日志记录和查询。
-10. 登录日志：系统登录日志记录查询包含登录异常。
-11. 在线用户：当前系统中活跃用户状态监控。
-12. 定时任务：在线（添加、修改、删除)任务调度包含执行结果日志。
-13. 代码生成：前后端代码的生成（java、html、xml、sql）支持CRUD下载 。
-14. 系统接口：根据业务代码自动生成相关的api接口文档。
-15. 服务监控：监视当前系统CPU、内存、磁盘、堆栈等相关信息。
-16. 缓存监控：对系统的缓存信息查询，命令统计等。
-17. 在线构建器：拖动表单元素生成相应的HTML代码。
-18. 连接池监视：监视当前系统数据库连接池状态，可进行分析SQL找出系统性能瓶颈。
+1. **文件上传**
+    - **支持多文件与批量文件上传**：用户可选择单个或多个文件进行上传。
+    - **前后端数据校验**：上传前进行文件类型、大小等校验，确保上传文件的合法性与完整性。
+    - **大文件分片与断点续传**：针对大文件采用分片上传机制，保证网络中断时可从上次中断处继续上传。
 
-## 在线体验
+2. **文件下载**
+    - **单文件或批量下载**：用户在文件列表中可选择单个或多个文件进行下载。
+    - **断点续传支持**：下载过程中提供断点续传功能，确保大文件传输的稳定性。
+    - **权限校验与日志记录**：下载请求通过 Ruoyi 权限控制模块验证，并记录操作日志，便于后续审计。
 
-- admin/admin123  
-- 陆陆续续收到一些打赏，为了更好的体验已用于演示服务器升级。谢谢各位小伙伴。
+3. **文件删除与回收**
+    - **安全删除**：删除操作前提供二次确认，防止误删。
+    - **回收站机制**：已删除文件暂存于回收站中，可在一定时间内恢复。
 
-演示地址：http://vue.ruoyi.vip  
-文档地址：http://doc.ruoyi.vip
+4. **文件重命名与移动**
+    - **重命名**：支持文件或目录重命名，保证名称的唯一性和兼容性。
+    - **文件移动**：通过拖拽或目录选择，实现文件的跨目录移动，目录结构自动维护。
 
-## 演示图
+5. **文件搜索与过滤**
+    - **关键字搜索**：内置搜索框，支持按照文件名称、类型、日期等多条件筛选。
+    - **模糊匹配**：支持模糊搜索，快速定位目标文件。
 
-<table>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/cd1f90be5f2684f4560c9519c0f2a232ee8.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/1cbcf0e6f257c7d3a063c0e3f2ff989e4b3.jpg"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8074972883b5ba0622e13246738ebba237a.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-9f88719cdfca9af2e58b352a20e23d43b12.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-39bf2584ec3a529b0d5a3b70d15c9b37646.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-936ec82d1f4872e1bc980927654b6007307.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-b2d62ceb95d2dd9b3fbe157bb70d26001e9.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d67451d308b7a79ad6819723396f7c3d77a.png"/></td>
-    </tr>	 
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/5e8c387724954459291aafd5eb52b456f53.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/644e78da53c2e92a95dfda4f76e6d117c4b.jpg"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-8370a0d02977eebf6dbf854c8450293c937.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-49003ed83f60f633e7153609a53a2b644f7.png"/></td>
-    </tr>
-	<tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-d4fe726319ece268d4746602c39cffc0621.png"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-c195234bbcd30be6927f037a6755e6ab69c.png"/></td>
-    </tr>
-    <tr>
-        <td><img src="https://oscimg.oschina.net/oscnet/b6115bc8c31de52951982e509930b20684a.jpg"/></td>
-        <td><img src="https://oscimg.oschina.net/oscnet/up-5e4daac0bb59612c5038448acbcef235e3a.png"/></td>
-    </tr>
-</table>
+6. **文件版本管理**
+    - **版本记录**：对文件修改过程进行版本记录，允许用户回溯历史版本。
+    - **版本恢复**：可根据版本记录选择回滚到指定版本，满足文件追溯需求。
 
+7. **权限管理与日志记录**
+    - **基于 Ruoyi 权限体系**：集成 Ruoyi 后台管理框架的权限管理模块，根据用户角色、部门进行精细化控制。
+    - **详细操作日志**：所有文件操作（上传、下载、删除、修改等）均记录在系统日志中，方便审计与问题排查。
 
-## 若依前后端分离交流群
+## 系统架构
 
-QQ群： [![加入QQ群](https://img.shields.io/badge/已满-937441-blue.svg)](https://jq.qq.com/?_wv=1027&k=5bVB1og) [![加入QQ群](https://img.shields.io/badge/已满-887144332-blue.svg)](https://jq.qq.com/?_wv=1027&k=5eiA4DH) [![加入QQ群](https://img.shields.io/badge/已满-180251782-blue.svg)](https://jq.qq.com/?_wv=1027&k=5AxMKlC) [![加入QQ群](https://img.shields.io/badge/已满-104180207-blue.svg)](https://jq.qq.com/?_wv=1027&k=51G72yr) [![加入QQ群](https://img.shields.io/badge/已满-186866453-blue.svg)](https://jq.qq.com/?_wv=1027&k=VvjN2nvu) [![加入QQ群](https://img.shields.io/badge/已满-201396349-blue.svg)](https://jq.qq.com/?_wv=1027&k=5vYAqA05) [![加入QQ群](https://img.shields.io/badge/已满-101456076-blue.svg)](https://jq.qq.com/?_wv=1027&k=kOIINEb5) [![加入QQ群](https://img.shields.io/badge/已满-101539465-blue.svg)](https://jq.qq.com/?_wv=1027&k=UKtX5jhs) [![加入QQ群](https://img.shields.io/badge/已满-264312783-blue.svg)](https://jq.qq.com/?_wv=1027&k=EI9an8lJ) [![加入QQ群](https://img.shields.io/badge/已满-167385320-blue.svg)](https://jq.qq.com/?_wv=1027&k=SWCtLnMz) [![加入QQ群](https://img.shields.io/badge/已满-104748341-blue.svg)](https://jq.qq.com/?_wv=1027&k=96Dkdq0k) [![加入QQ群](https://img.shields.io/badge/已满-160110482-blue.svg)](https://jq.qq.com/?_wv=1027&k=0fsNiYZt) [![加入QQ群](https://img.shields.io/badge/已满-170801498-blue.svg)](https://jq.qq.com/?_wv=1027&k=7xw4xUG1) [![加入QQ群](https://img.shields.io/badge/已满-108482800-blue.svg)](https://jq.qq.com/?_wv=1027&k=eCx8eyoJ) [![加入QQ群](https://img.shields.io/badge/已满-101046199-blue.svg)](https://jq.qq.com/?_wv=1027&k=SpyH2875) [![加入QQ群](https://img.shields.io/badge/已满-136919097-blue.svg)](https://jq.qq.com/?_wv=1027&k=tKEt51dz) [![加入QQ群](https://img.shields.io/badge/已满-143961921-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=0vBbSb0ztbBgVtn3kJS-Q4HUNYwip89G&authKey=8irq5PhutrZmWIvsUsklBxhj57l%2F1nOZqjzigkXZVoZE451GG4JHPOqW7AW6cf0T&noverify=0&group_code=143961921) [![加入QQ群](https://img.shields.io/badge/已满-174951577-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=ZFAPAbp09S2ltvwrJzp7wGlbopsc0rwi&authKey=HB2cxpxP2yspk%2Bo3WKTBfktRCccVkU26cgi5B16u0KcAYrVu7sBaE7XSEqmMdFQp&noverify=0&group_code=174951577) [![加入QQ群](https://img.shields.io/badge/已满-161281055-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Fn2aF5IHpwsy8j6VlalNJK6qbwFLFHat&authKey=uyIT%2B97x2AXj3odyXpsSpVaPMC%2Bidw0LxG5MAtEqlrcBcWJUA%2FeS43rsF1Tg7IRJ&noverify=0&group_code=161281055) [![加入QQ群](https://img.shields.io/badge/已满-138988063-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=XIzkm_mV2xTsUtFxo63bmicYoDBA6Ifm&authKey=dDW%2F4qsmw3x9govoZY9w%2FoWAoC4wbHqGal%2BbqLzoS6VBarU8EBptIgPKN%2FviyC8j&noverify=0&group_code=138988063) [![加入QQ群](https://img.shields.io/badge/151450850-blue.svg)](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=DkugnCg68PevlycJSKSwjhFqfIgrWWwR&authKey=pR1Pa5lPIeGF%2FFtIk6d%2FGB5qFi0EdvyErtpQXULzo03zbhopBHLWcuqdpwY241R%2F&noverify=0&group_code=151450850) 点击按钮入群。
+### 前端部分
+- 基于 Ruoyi 前端 UI 框架（如 Vue + Element UI）构建，提供直观的用户操作界面。
+- 实现文件列表展示、预览、批量操作、拖拽上传等交互功能。
+
+### 后端部分 (Ruoyi 框架)
+- **基于 Ruoyi 框架开发**：
+    - 继承 Ruoyi 框架的项目架构，并利用其内置的权限管理、日志记录和消息通知等模块。
+    - 模块化设计，文件管理模块作为独立业务模块接入 Ruoyi 后台。
+- **业务逻辑实现**：
+    - 文件上传、下载、删除、重命名等操作的具体业务逻辑实现。
+    - 利用 Ruoyi 框架统一的异常处理、数据校验与接口返回机制，提高系统的健壮性。
+- **数据存储与接口安全**：
+    - 文件元数据存储在数据库中（如 MySQL、PostgreSQL）。
+    - 使用 Token 或 Session 机制进行接口访问验证，保证数据安全。
+
+### 数据库与缓存
+- **数据库**：
+    - 文件相关元数据及日志信息存储在关系型数据库中，确保数据一致性。
+- **缓存**：
+    - 利用 Redis 等缓存系统提高文件信息检索速度及系统响应效率。
+
+## 部署与配置
+
+1. **环境要求**
+    - 服务器操作系统：建议使用 windows 环境。
+    - 数据库：MySQL、PostgreSQL 或其它 Ruoyi 支持的数据库。
+    - 其他依赖：JDK（如使用 SpringBoot 实现后端）、Node.js（用于前端开发）等。
+
+2. **部署步骤**
+    - **代码获取与构建**：
+        1. 克隆 Ruoyi 项目代码，并将文件管理模块集成到项目中。
+        2. 根据项目要求安装相应依赖（Maven/Gradle 依赖管理，NPM/Yarn 前端依赖管理）。
+    - **配置环境**：
+        1. 配置数据库连接信息及相关环境变量。
+        2. 根据 Ruoyi 官方文档调整权限、日志等配置项。
+    - **启动项目**：
+        1. 运行后端启动脚本（如 SpringBoot 启动命令）。
+        2. 启动前端项目，通过 npm run dev 或打包部署到静态资源服务器。
+    - **访问与调试**：
+        1. 使用浏览器访问 Ruoyi 后台管理系统首页，登录后在对应模块中可以看到文件管理的入口。
+
+## 使用示例
+
+- **文件上传**
+    1. 登录 Ruoyi 后台管理系统。
+    2. 进入文件管理模块，点击“上传文件”按钮，选择本地文件。
+    3. 系统会自动处理文件分片上传（对于大文件）并在上传成功后更新文件列表。
+
+- **文件下载**
+    1. 在文件管理列表中选择需要下载的文件。
+    2. 点击下载按钮，后端先进行权限校验，再启动文件下载，同时记录操作日志。
+
+- **版本恢复**
+    1. 进入文件详情页，查看该文件的历史版本信息。
+    2. 选择需要恢复的版本，点击“恢复”按钮完成版本回溯操作。
+
+## 常见问题
+
+- **上传或下载速度慢**：
+    - 请检查网络环境，同时确认服务器配置是否满足高并发需求。
+    - 利用分片上传和断点续传机制可有效缓解网络波动带来的影响。
+
+- **文件误删或数据丢失**：
+    - 系统支持回收站机制，通过管理员权限可以恢复误删文件。
+    - 文件版本管理功能也可用于部分恢复操作。
+
+- **权限不足无法操作**：
+    - 请联系管理员检查用户权限，确保当前用户具有相应文件操作权限。
+
+## 维护与更新
+
+- **模块化设计**：各功能模块均独立开发，方便后续扩展或定制开发。
+- **更新日志**：请关注 Ruoyi 官方更新日志及本项目的更新说明，及时了解最新修复与功能增强。
+- **问题反馈**：如在使用过程中遇到问题，请通过项目 Issue 或联系维护团队反馈建议。
+
+---
+
