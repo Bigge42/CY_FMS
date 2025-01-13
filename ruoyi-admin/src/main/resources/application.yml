@@ -27,10 +27,13 @@ gen:
 
 # FTP配置
 ftp:
-  host: 127.0.0.1
   port: 21
+  host: 127.0.0.1
   username: SICCV
   password: 970308
+  # host: 10.11.0.20
+  # username: administrator
+  # password: Server20
   remote-dir: uploads
 
 # 临时目录配置
