@@ -85,7 +85,7 @@ public class FtpController {
     @PostMapping("/upload")
     public Response uploadFile(@RequestParam("file") MultipartFile file,
                                @RequestParam("DocumentTypeID") Integer documentTypeID,
-                               @RequestParam("matchID") Integer matchID,
+                               @RequestParam("matchID") String matchID,
                                @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
 
         if (documentTypeID == null) {

@@ -41,7 +41,7 @@ CREATE TABLE CY_FILE (
                          FileName VARCHAR(255) NOT NULL COMMENT '文件名',
                          FolderID INT NOT NULL COMMENT '所属文件夹ID',
                          DocumentTypeID INT NULL COMMENT '文档类型ID',
-                         MatchID INT NULL COMMENT '匹配ID',
+                         MatchID VARCHAR(50) NULL COMMENT '匹配ID',
                          DocumentTypeName VARCHAR(100) NOT NULL COMMENT '文档类型名称',
                          VersionNumber VARCHAR(50) NOT NULL COMMENT '版本号',
                          FileTag VARCHAR(100) NULL COMMENT '文件标签',

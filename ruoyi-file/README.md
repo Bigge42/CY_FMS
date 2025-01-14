@@ -50,7 +50,7 @@ http://10.11.0.20:8088/fms/ftp/upload
 |------------------|---------|-----|------------------------------------------------------------|
 | file             | File    | 是  | 要上传的文件。注意：使用 form-data 中的 file 类型上传。           |
 | DocumentTypeID   | Integer | 是  | 文档类型 ID。系统内部通过该 ID 获取对应文档类型英文名称，例如 2 表示 Certificate（合格证）。 |
-| matchID          | Integer | 是  | 匹配 ID，用于唯一标识该文件的记录。                                  |
+| matchID          | String | 是  | 匹配 ID，用于唯一标识该文件的记录。                                  |
 | PlanTrackingNumber | String | 否  | 计划跟踪号，若有计划跟踪信息可传入（选填）。                          |
 
 ---

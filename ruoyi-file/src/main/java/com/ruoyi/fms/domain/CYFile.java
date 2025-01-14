@@ -7,7 +7,7 @@ public class CYFile {
     private String fileName;
     private Integer folderID;
     private Integer documentTypeID;
-    private Integer matchID;
+    private String matchID;
     private String documentTypeName;
     private String versionNumber;
     private String fileTag;
@@ -56,11 +56,11 @@ public class CYFile {
         this.documentTypeID = documentTypeID;
     }
 
-    public Integer getMatchID() {
+    public String getMatchID() {
         return matchID;
     }
 
-    public void setMatchID(Integer matchID) {
+    public void setMatchID(String matchID) {
         this.matchID = matchID;
     }
 
@@ -143,7 +143,7 @@ public class CYFile {
     public void setFileURL(String fileURL) {
         this.fileURL = fileURL;
     }
-    
+
     public String getPlanTrackingNumber() {
         return PlanTrackingNumber;
     }
