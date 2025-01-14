@@ -18,8 +18,11 @@ public class CYFile {
     private Date updatedAt;
     private String remarks;
     private String fileURL;
+    private String PlanTrackingNumber;
 
     // Getters and Setters
+
+
 
     public Integer getFileID() {
         return fileID;
@@ -139,5 +142,13 @@ public class CYFile {
 
     public void setFileURL(String fileURL) {
         this.fileURL = fileURL;
+    }
+    
+    public String getPlanTrackingNumber() {
+        return PlanTrackingNumber;
+    }
+
+    public void setPlanTrackingNumber(String planTrackingNumber) {
+        PlanTrackingNumber = planTrackingNumber;
     }
 }

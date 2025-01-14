@@ -6,8 +6,8 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface CYFileMapper {
 
-        @Insert("INSERT INTO CY_FILE(fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, createdBy, createdAt, fileURL) " +
-                "VALUES(#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{createdBy}, NOW(), #{fileURL})")
+        @Insert("INSERT INTO CY_FILE(fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
+                "VALUES(#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{planTrackingNumber}, #{createdBy}, NOW(), #{fileURL})")
         @Options(useGeneratedKeys = true, keyProperty = "fileID")
         int insertFile(CYFile file);
 

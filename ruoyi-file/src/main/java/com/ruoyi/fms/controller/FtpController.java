@@ -35,32 +35,62 @@ public class FtpController {
 
     // 允许的文档类型
     private static final List<String> ALLOWED_DOCUMENT_TYPES = Arrays.asList(
-            "材质理化报告",
-            "合格证",
-            "说明书",
-            "产品检验报告",
-            "装箱单",
-            "供应商原材料报告",
-            "abc"
+            "Material Physicochemical Report",   // 材质理化报告
+            "Certificate",                         // 合格证
+            "Manual",                              // 说明书
+            "Product Inspection Report",           // 产品检验报告
+            "Packing List",                        // 装箱单
+            "Supplier Raw Material Report"         // 供应商原材料报告
     );
+
+
+    /**
+     * 根据 DocumentTypeID 获取对应的文档类型名称（英文名称）
+     *
+     * @param documentTypeID 文档类型ID
+     * @return 英文文档类型名称，如果不存在则返回 null
+     */
+    private String getDocumentTypeName(Integer documentTypeID) {
+        if (documentTypeID == null) {
+            return null;
+        }
+        switch (documentTypeID) {
+            case 1:
+                return "Material Physicochemical Report";  // 材质理化报告
+            case 2:
+                return "Certificate";                        // 合格证
+            case 3:
+                return "Manual";                             // 说明书
+            case 4:
+                return "Product Inspection Report";          // 产品检验报告
+            case 5:
+                return "Packing List";                       // 装箱单
+            case 6:
+                return "Supplier Raw Material Report";       // 供应商原材料报告
+            default:
+                return null;
+        }
+    }
 
     /**
      * 文件上传接口
      *
-     * @param file             上传的文件
-     * @param documentTypeName 文档类型名称
-     * @param matchID          匹配ID
+     * @param file               上传的文件
+     * @param documentTypeID     文档类型ID（必填）
+     * @param matchID            匹配ID（必填）
+     * @param planTrackingNumber 计划跟踪号（选填）
      * @return 上传结果
      */
     @Anonymous
     @PostMapping("/upload")
     public Response uploadFile(@RequestParam("file") MultipartFile file,
-                               @RequestParam("documentTypeName") String documentTypeName,
-                               @RequestParam("matchID") Integer matchID) {
-        // 验证文档类型
-        if (!ALLOWED_DOCUMENT_TYPES.contains(documentTypeName)) {
-            log.warn("不支持的文档类型: {}", documentTypeName);
-            return Response.error("不支持的文档类型: " + documentTypeName);
+                               @RequestParam("DocumentTypeID") Integer documentTypeID,
+                               @RequestParam("matchID") Integer matchID,
+                               @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
+
+        if (documentTypeID == null) {
+            log.warn("DocumentTypeID 不能为空");
+            return Response.error("DocumentTypeID 不能为空");
         }
 
         if (file.isEmpty()) {
@@ -71,6 +101,12 @@ public class FtpController {
         if (matchID == null) {
             log.warn("MatchID 不能为空");
             return Response.error("MatchID 不能为空");
+        }
+        // 根据 DocumentTypeID 获取文档类型名称（英文名称）
+        String documentTypeName = getDocumentTypeName(documentTypeID);
+        if (documentTypeName == null || !ALLOWED_DOCUMENT_TYPES.contains(documentTypeName)) {
+            log.warn("不支持的文档类型ID: {}", documentTypeID);
+            return Response.error("不支持的文档类型ID: " + documentTypeID);
         }
 
         // 生成时间戳
@@ -139,6 +175,7 @@ public class FtpController {
             cyFile.setVersionNumber(timestamp);
             cyFile.setCreatedBy("system"); // 可以根据实际情况替换创建者
             cyFile.setFileURL(fileURL);
+            cyFile.setPlanTrackingNumber(planTrackingNumber);
 
             int insertResult = fileService.saveFileRecord(cyFile);
             if (insertResult <= 0) {

@@ -45,6 +45,7 @@ CREATE TABLE CY_FILE (
                          DocumentTypeName VARCHAR(100) NOT NULL COMMENT '文档类型名称',
                          VersionNumber VARCHAR(50) NOT NULL COMMENT '版本号',
                          FileTag VARCHAR(100) NULL COMMENT '文件标签',
+                         PlanTrackingNumber VARCHAR(100) NULL COMMENT '计划跟踪号',
                          DeleteFlag TINYINT(1) DEFAULT 0 COMMENT '删除标志', -- 0表示正常，1表示已删除
                          CreatedBy VARCHAR(50) NOT NULL COMMENT '创建者',
                          CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
