@@ -35,7 +35,7 @@ public class FtpController {
 
     // 允许的文档类型
     private static final List<String> ALLOWED_DOCUMENT_TYPES = Arrays.asList(
-            "Material Physicochemical Report",   // 材质理化报告
+            "Material Physicochemical Report",     // 材质理化报告
             "Certificate",                         // 合格证
             "Manual",                              // 说明书
             "Product Inspection Report",           // 产品检验报告
