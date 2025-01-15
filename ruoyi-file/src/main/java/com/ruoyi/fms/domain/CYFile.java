@@ -21,9 +21,6 @@ public class CYFile {
     private String PlanTrackingNumber;
 
     // Getters and Setters
-
-
-
     public Integer getFileID() {
         return fileID;
     }
