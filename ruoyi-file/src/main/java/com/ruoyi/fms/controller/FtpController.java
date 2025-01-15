@@ -67,6 +67,8 @@ public class FtpController {
                 return "Packing List";                       // 装箱单
             case 6:
                 return "Supplier Raw Material Report";       // 供应商原材料报告
+            case 7:
+                return "Packing Photo";                      // 装箱单照片
             default:
                 return null;
         }
