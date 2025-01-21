@@ -113,45 +113,59 @@ public class FtpService {
     /**
      * 下载文件从 FTP 服务器。
      *
-     * @param remoteFolder   远程文件夹路径（相对于 ftp.remoteDir）
-     * @param remoteFileName 远程文件名
-     * @param localFilePath  本地文件路径，用于保存下载的文件
+     * @param remoteFolder   远程文件夹路径（例如 "uploads/合格证"，注意该路径相对于 ftpConfig.getRemoteDir() 的实际映射路径）
+     * @param remoteFileName 远程文件名（例如 "file.txt"）
+     * @param localFilePath  本地文件保存的完整路径（例如 "/tmp/file.txt"）
      * @return 如果下载成功，返回 true；否则返回 false
      * @throws IOException 如果发生 I/O 错误
      */
     public boolean downloadFile(String remoteFolder, String remoteFileName, String localFilePath) throws IOException {
         FTPClient ftpClient = new FTPClient();
         try {
+            // 1. 连接并登录到 FTP 服务器
             connectAndLogin(ftpClient);
+
+            // 2. 设置文件传输为二进制方式，避免文本文件与二进制文件的传输差异
             ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+
+            // 3. 切换为被动模式，适应网络防火墙等环境
             ftpClient.enterLocalPassiveMode();
 
-            // 启用 UTF-8 编码
+            // 4. 启用 UTF-8 编码（若服务器支持），确保中文和特殊字符正常传输
             enableUTF8Encoding(ftpClient);
 
-            // 切换到目标目录
+            // 5. 切换到目标远程文件夹
+            //    remoteFolder 是相对路径（例如 "uploads/合格证"），应与 FTP 服务器上实际路径对应
             boolean changedDir = ftpClient.changeWorkingDirectory(remoteFolder);
             if (!changedDir) {
-                throw new IOException("无法切换到远程目录: " + remoteFolder);
+                log.error("无法切换到远程目录: {}，回复码: {}, 回复信息: {}",
+                        remoteFolder, ftpClient.getReplyCode(), ftpClient.getReplyString());
+                return false;
             }
 
-            // 下载文件
+            // 6. 打开本地文件输出流，用于保存下载的文件数据
             File localFile = new File(localFilePath);
             try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(localFile))) {
+                // 7. 从 FTP 服务器获取文件，并将内容写入本地输出流
                 boolean success = ftpClient.retrieveFile(remoteFileName, outputStream);
                 if (success) {
-                    log.info("文件下载成功: {}/{} 到 {}", remoteFolder, remoteFileName, localFilePath);
+                    log.info("文件下载成功: {}/{} 到本地路径: {}", remoteFolder, remoteFileName, localFilePath);
                 } else {
                     log.error("文件下载失败: {}/{}. 回复码: {}, 回复信息: {}",
                             remoteFolder, remoteFileName, ftpClient.getReplyCode(), ftpClient.getReplyString());
                 }
                 return success;
             }
-
+        } catch (IOException e) {
+            log.error("下载文件时发生异常: {}", e.getMessage(), e);
+            throw e;
         } finally {
+            // 8. 无论下载是否成功，都需要断开与 FTP 服务器的连接
             disconnect(ftpClient);
         }
     }
+
+
 
     /**
      * 删除文件从 FTP 服务器。
@@ -278,27 +292,24 @@ public class FtpService {
     }
 
     /**
-     * 构建文件的 FTP URL。
+     * 构建文件的 FTP 相对路径。
      *
      * @param remoteFolderPath 远程文件夹路径（例如 "uploads/合格证"）
      * @param remoteFileName   远程文件名
-     * @return 文件的 FTP URL（例如 "ftp://username:password@host:port/uploads/合格证/file.txt"）
+     * @return 文件的 FTP 相对路径（例如 "uploads/合格证/file.txt"）
      */
     public String getFtpUrl(String remoteFolderPath, String remoteFileName) {
         try {
+            // 对路径中的空格进行简单处理（也可以根据需要进行更严格的编码）
             String encodedPath = remoteFolderPath.replace(" ", "%20")
                     + "/" + remoteFileName.replace(" ", "%20");
-            return String.format("ftp://%s:%s@%s:%d/%s",
-                    ftpConfig.getUsername(),
-                    ftpConfig.getPassword(),
-                    ftpConfig.getHost(),
-                    ftpConfig.getPort(),
-                    encodedPath);
+            return encodedPath;
         } catch (Exception e) {
             log.error("构建 FTP URL 失败: {}", e.getMessage(), e);
             return null;
         }
     }
+
 
     /**
      * 获取临时目录路径，用于在本地存储上传或下载的文件。

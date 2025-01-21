@@ -1,102 +1,167 @@
-下面给出一份针对上传接口的详细使用说明和测试文档示例，说明文档中包含接口描述、请求 URL、请求参数说明、请求示例以及 Postman 测试配置示例，供你参考。
 
 ---
 
-# 上传接口使用说明
+# FMS FTP 接口文档
 
-## 接口描述
-
-该接口用于将文件上传到 FTP 服务器，并将相应的文件记录保存至数据库。上传时需要传入以下参数：
-
-- **file**：上传的文件（文件类型），必填。
-- **DocumentTypeID**：文档类型 ID（必填）。上传前，根据该参数通过内部逻辑转换为英文文档类型名称。内部允许的文档类型包括：
-  - **1** 对应 *Material Physicochemical Report*（材质理化报告）
-  - **2** 对应 *Certificate*（合格证）
-  - **3** 对应 *Manual*（说明书）
-  - **4** 对应 *Product Inspection Report*（产品检验报告）
-  - **5** 对应 *Packing List*（装箱单）
-  - **6** 对应 *Supplier Raw Material Report*（供应商原材料报告）
-- **matchID**：匹配 ID（必填）。用于唯一标识对应的文件记录。
-- **PlanTrackingNumber**：计划跟踪号（选填），若有计划跟踪信息可传入。
-
-接口接收到请求后会：
-1. 校验必填项是否为空。
-2. 根据传入的 `DocumentTypeID` 调用内部方法 `getDocumentTypeName` 获取对应的英文文档类型名称，并与允许的文档类型列表 (`ALLOWED_DOCUMENT_TYPES`) 对比。如果非法，则返回错误信息。
-3. 为文件生成唯一的时间戳和新文件名，并在本地临时目录保存文件。
-4. 查找或创建对应的文件夹，再将文件上传至 FTP 服务器。
-5. 构建文件 URL，并将相关文件记录（包括文件名、文档类型、matchID、时间戳、计划跟踪号等）保存至数据库。
-6. 最后返回上传成功信息及文件 URL，或相应的错误提示。
+> **说明：**  
+> 本接口前缀为 `http://localhost:8088/fms/ftp`  
+> 允许上传的文档类型包括：`材质理化报告`、`合格证`、`说明书`、`产品检验报告`、`装箱单`、`供应商原材料报告`、`abc` 等。
 
 ---
 
-## 请求 URL
+## 1. 文件上传接口
 
+**URL**
 ```
-[POST] http://<server-address>/fms/ftp/upload
-```
-
-*示例地址：*
-```
-http://10.11.0.20:8088/fms/ftp/upload
+POST http://localhost:8088/fms/ftp/upload
 ```
 
-*注：请根据实际部署地址修改 `<server-address>`。*
+**请求参数**
+- **form-data** 类型参数：
+    - `file` (file, 必传)：上传的文件内容。
+    - `documentTypeName` (string, 必传)：文档类型名称。必须为允许的文档类型之一，例如 `"合格证"`。
+    - `matchID` (number, 必传)：匹配 ID，用于文件记录的关联。
 
----
+**请求说明**
+- 上传接口会：
+    1. 保存上传文件到本地临时目录；
+    2. 根据 `documentTypeName` 查找或创建对应文件夹记录；
+    3. 调用 FTP 服务上传文件，目标目录由文件夹记录的物理路径构成，生成相对路径格式，如： `"uploads/合格证/xxx_20250121155010.pdf"`；
+    4. 将上传成功后的相对路径（如 `"uploads/合格证/xxx_20250121155010.pdf"`) 写入数据库文件记录；
+    5. 返回 JSON 响应时额外返回 `url` 字段，值为上述相对路径，不包含 FTP 登录信息。
 
-## 请求参数说明
+**示例请求**  
+在 Postman 中设置 Body 类型为 `form-data`：
 
-| 参数名             | 类型      | 必填 | 说明                                                         |
-|------------------|---------|-----|------------------------------------------------------------|
-| file             | File    | 是  | 要上传的文件。注意：使用 form-data 中的 file 类型上传。           |
-| DocumentTypeID   | Integer | 是  | 文档类型 ID。系统内部通过该 ID 获取对应文档类型英文名称，例如 2 表示 Certificate（合格证）。 |
-| matchID          | String | 是  | 匹配 ID，用于唯一标识该文件的记录。                                  |
-| PlanTrackingNumber | String | 否  | 计划跟踪号，若有计划跟踪信息可传入（选填）。                          |
+| Key               | Type    | Value                          |
+|-------------------|---------|--------------------------------|
+| file              | File    | 选择本地文件                   |
+| documentTypeName  | Text    | 合格证                         |
+| matchID           | Text    | 123                            |
 
----
-
-## 请求示例
-
-**示例说明**：  
-假设上传一个文件，`DocumentTypeID` 为 **2** （即 Certificate 合格证）、`matchID` 为 **123**，且计划跟踪号为 **PTN-20250114-001**。
-
-**接口调用后成功返回示例：**
-
+**示例响应（成功）**
 ```json
 {
   "code": 200,
   "msg": "文件上传成功并已存储到数据库",
-  "url": "ftp://yourftpserver/path/to/uploaded/file_newFileName.ext"
+  "url": "uploads/合格证/xxx_20250121155010.pdf"
 }
 ```
 
-如果传入的 `DocumentTypeID` 不符合要求或其他参数有误，则可能返回类似下面的错误提示：
-
+**示例响应（失败）**
 ```json
 {
   "code": 500,
-  "msg": "不支持的文档类型ID: 7"
+  "msg": "文件上传到 FTP 失败"
 }
 ```
+
 ---
 
-## 使用说明
+## 2. 文件下载接口（返回本地存储路径）
 
-1. **导入 Collection**
-  - 将上面的 JSON 内容复制到一个文件中，保存为 `FMS_FTP_Upload.postman_collection.json`。
-  - 打开 Postman，点击左上角的 **Import**，选择该 JSON 文件导入。
+**URL**
+```
+GET http://localhost:8088/fms/ftp/downloadPath
+```
 
-2. **配置请求参数**
-  - 在 Postman 中选择“文件上传接口”请求。
-  - 在 `Body` → `form-data` 中，填写各个字段：
-    - **file**：点击选择本地文件；
-    - **DocumentTypeID**：填写对应的文档类型 ID（示例中使用 2 表示 Certificate 合格证）；
-    - **matchID**：填写匹配 ID（例如 123）；
-    - **PlanTrackingNumber**：可填写计划跟踪号（例如 PTN-20250114-001，可选）。
+**请求参数（Query 参数）**
+- `filePath` (string, 必传)：文件在 FTP 上的相对路径，例如：`uploads/合格证/file.txt`
 
-3. **修改请求 URL**
-  - 如实际部署地址不一致，请修改请求 URL 中的 `http://10.11.0.20:8088` 为正确的服务器地址。
+**请求说明**
+- 接口流程：
+    1. 根据提供的 `filePath` 拆分出远程文件夹和文件名；
+    2. 调用 FTP 下载方法，将文件保存到本地临时目录（路径由 FTP 配置中的临时目录和文件名拼接生成）；
+    3. 返回 JSON 响应，提示文件下载成功与否，并返回本地文件保存路径。
 
-4. **发送请求测试**
-  - 点击 **Send** 按钮提交请求，检查返回结果是否符合预期。
+**示例请求**
+```
+GET http://localhost:8088/fms/ftp/downloadPath?filePath=uploads/合格证/file.txt
+```
 
+**示例响应（成功）**
+```json
+{
+  "code": 200,
+  "msg": "文件下载成功，已保存到本地",
+  "localPath": "/tmp/file.txt"
+}
+```
+
+**示例响应（失败）**
+```json
+{
+  "code": 500,
+  "msg": "文件下载失败，请确认远程路径是否正确或FTP是否可用"
+}
+```
+
+---
+
+## 3. 文件下载接口（直接输出文件流）
+
+> **说明：**  
+> 如果希望浏览器直接弹出文件下载对话框，可以使用下面的接口，该接口直接通过 HTTP 流返回文件数据。
+
+**URL**
+```
+GET http://localhost:8088/fms/ftp/download
+```
+
+**请求参数（Query 参数）**
+- `filePath` (string, 必传)：文件在 FTP 上的相对路径，例如：`uploads/合格证/file.txt`
+
+**请求说明**
+- 接口流程：
+    1. 根据提供的 `filePath` 拆分出远程文件夹和文件名；
+    2. 调用 FTP 下载方法，将文件保存到本地临时目录；
+    3. 将本地文件通过 `HttpServletResponse` 输出流传回给前端，从而实现直接下载；
+    4. 下载完成后可清理本地临时文件。
+
+**示例请求**
+```
+GET http://localhost:8088/fms/ftp/download?filePath=uploads/合格证/file.txt
+```
+
+**返回说明**
+- 成功时，浏览器会弹出保存对话框或自动下载文件；
+- 失败时，HTTP 状态码或响应体中会返回错误提示消息。
+
+---
+
+## 4. 文件删除接口()
+
+**URL**
+```
+不开放
+```
+
+**请求参数（Query 参数）**
+- `fileName` (string, 必传)：文件名标识（用于查找数据库中的文件记录，通常与 `documentTypeName` 关联，如 `合格证` 下的文件名）。
+- `matchID` (number, 必传)：匹配 ID，用于定位数据库中的文件记录。
+
+**请求说明**
+- 接口会查找数据库中的文件记录，再获取对应文件夹信息，调用 FTP 删除方法删除对应远程文件，同时标记数据库记录为删除。
+
+**示例请求**
+```
+DELETE http://localhost:8088/fms/ftp/delete?fileName=xxx_20250121155010.pdf&matchID=123
+```
+
+**示例响应（成功）**
+```json
+{
+  "code": 200,
+  "msg": "文件删除成功"
+}
+```
+
+**示例响应（失败）**
+```json
+{
+  "code": 500,
+  "msg": "文件删除失败: 未找到对应的文件记录"
+}
+```
+
+---

@@ -9,10 +9,14 @@ import com.ruoyi.fms.service.FtpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -40,7 +44,8 @@ public class FtpController {
             "Manual",                              // 说明书
             "Product Inspection Report",           // 产品检验报告
             "Packing List",                        // 装箱单
-            "Supplier Raw Material Report"         // 供应商原材料报告
+            "Supplier Raw Material Report",        // 供应商原材料报告
+            "Packing Photo"                        // 装箱单照片
     );
 
 
@@ -202,47 +207,62 @@ public class FtpController {
     }
 
     /**
-     * 文件下载接口
+     * 下载文件接口 - 通过相对路径，直接返回文件流
      *
-     * @param documentTypeName 文档类型名称和文件名（用于查找文件记录）
-     * @param matchID  匹配ID
-     * @return 下载结果
+     * @param filePath 相对路径，如 "uploads/合格证/file.txt"
+     * @param response HttpServletResponse，用于输出文件流
      */
     @Anonymous
     @GetMapping("/download")
-    public Response downloadFile(@RequestParam("documentTypeName") String documentTypeName,
-                                 @RequestParam("matchID") Integer matchID) {
+    public void downloadFile(@RequestParam("filePath") String filePath,
+                             HttpServletResponse response) {
         try {
-            // 根据文件名和 MatchID 查找文件记录
-            CYFile cyFile = fileService.findFileByNameAndMatchID(documentTypeName, matchID);
-            if (cyFile == null) {
-                log.warn("未找到对应的文件记录: 文件类型={}, MatchID={}", documentTypeName, matchID);
-                return Response.error("未找到对应的文件记录");
+            // 1. 分割出 folder & fileName
+            int lastSlashIndex = filePath.lastIndexOf('/');
+            if (lastSlashIndex < 0) {
+                // 如果没有'/'，说明传入有误，这里可自行处理
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().write("filePath 格式不正确");
+                return;
+            }
+            String folder = filePath.substring(0, lastSlashIndex);
+            String fileName = filePath.substring(lastSlashIndex + 1);
+
+            // 2. 本地暂存路径
+            String localFilePath = ftpService.getTempDir() + fileName;
+
+            // 3. 调用 FtpService 下载
+            boolean success = ftpService.downloadFile(folder, fileName, localFilePath);
+            if (!success) {
+                // 下载失败就写一个提示
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().write("文件下载失败或不存在");
+                return;
             }
 
-            // 获取文件夹信息
-            CYFolder folder = folderService.findFolderById(cyFile.getFolderID());
-            if (folder == null) {
-                log.warn("未找到对应的文件夹: FolderID={}", cyFile.getFolderID());
-                return Response.error("未找到对应的文件夹");
+            // 4. 设置响应头
+            // Content-Type 根据文件后缀而定，简化处理成通用的application/octet-stream
+            response.setContentType("application/octet-stream");
+            // 设置下载弹窗的文件名，这里直接使用原始 fileName
+            // 如果需要处理中文文件名等，请进行URL编码
+            response.setHeader("Content-Disposition",
+                    "attachment;filename=\"" + fileName + "\"");
+
+            // 5. 将本地文件流写入 response 输出流
+            try (java.io.InputStream is = Files.newInputStream(Paths.get(localFilePath))) {
+                StreamUtils.copy(is, response.getOutputStream());
             }
 
-            String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
-            String remoteFileName = cyFile.getFileName();
+            // 6. 如果需要，写完后清理本地缓存文件
+            Files.deleteIfExists(Paths.get(localFilePath));
 
-            // 下载文件到临时目录
-            String localFilePath = ftpService.getTempDir() + remoteFileName;
-            boolean downloadResult = ftpService.downloadFile(remoteFolderPath, remoteFileName, localFilePath);
-            if (!downloadResult) {
-                log.error("文件下载失败: {}", remoteFileName);
-                return Response.error("文件下载失败");
-            }
-            log.info("文件成功从 FTP 下载: {}", remoteFileName);
-
-            return Response.success("文件下载成功，保存到: " + localFilePath);
         } catch (Exception e) {
-            log.error("文件下载失败: {}", e.getMessage(), e);
-            return Response.error("文件下载失败: " + e.getMessage());
+            try {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().write("下载出现异常: " + e.getMessage());
+            } catch (Exception ex) {
+                // 忽略写错误信息时的异常
+            }
         }
     }
 
