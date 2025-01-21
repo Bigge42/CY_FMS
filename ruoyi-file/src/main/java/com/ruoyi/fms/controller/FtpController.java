@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
+import java.io.*;
+import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -206,6 +207,7 @@ public class FtpController {
         }
     }
 
+
     /**
      * 下载文件接口 - 通过相对路径，直接返回文件流
      *
@@ -266,6 +268,78 @@ public class FtpController {
         }
     }
 
+    /**
+     * 浏览文件接口 - 通过相对路径，直接返回文件流
+     *
+     * @param filePath 相对路径，如 "uploads/合格证/file.txt"
+     * @param response HttpServletResponse，用于输出文件流
+     */
+    @Anonymous
+    @GetMapping("/preview")
+    public void previewFile(@RequestParam("filePath") String filePath,
+                            HttpServletResponse response) {
+        try {
+            // 1. 解析 filePath，分离出文件夹和文件名
+            int lastSlashIndex = filePath.lastIndexOf('/');
+            if (lastSlashIndex < 0) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().write("filePath 格式不正确");
+                return;
+            }
+            String remoteFolder = filePath.substring(0, lastSlashIndex);
+            String fileName = filePath.substring(lastSlashIndex + 1);
+
+            // 2. 本地暂存路径（可以使用临时目录）
+            String localFilePath = ftpService.getTempDir() + fileName;
+
+            // 3. 下载文件到本地（与下载接口类似）
+            boolean success = ftpService.downloadFile(remoteFolder, fileName, localFilePath);
+            if (!success) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().write("文件下载失败或不存在");
+                return;
+            }
+
+            // 4. 根据文件类型设置 Content-Type
+            // 例如，这里简单根据文件扩展名决定，实际可使用更完善的方式。
+            String contentType = "application/octet-stream";
+            if (fileName.endsWith(".png")) {
+                contentType = "image/png";
+            } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                contentType = "image/jpeg";
+            } else if (fileName.endsWith(".gif")) {
+                contentType = "image/gif";
+            } else if (fileName.endsWith(".pdf")) {
+                contentType = "application/pdf";
+            } else if (fileName.endsWith(".txt")) {
+                contentType = "text/plain";
+            }
+            response.setContentType(contentType);
+
+            // 5. 设置响应头，采用 inline 使浏览器直接显示，不弹出下载对话框
+            response.setHeader("Content-Disposition", "inline; filename=" + URLEncoder.encode(fileName, "UTF-8"));
+
+            // 6. 将本地文件流写入 HTTP 响应
+            try (InputStream inputStream = new FileInputStream(localFilePath);
+                 OutputStream outputStream = response.getOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+            }
+
+            // 7. 删除本地临时文件（根据实际情况选择是否删除）
+            new File(localFilePath).delete();
+        } catch (Exception e) {
+            try {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                response.getWriter().write("预览出现异常: " + e.getMessage());
+            } catch (IOException ex) {
+                log.error("无法返回异常信息到客户端", ex);
+            }
+        }
+    }
     /**
      * 删除文件接口
      *
