@@ -62,7 +62,7 @@ POST http://localhost:8088/fms/ftp/upload
 
 **URL**
 ```
-GET http://localhost:8088/fms/ftp/downloadPath
+GET http://localhost:8088/fms/ftp/download
 ```
 
 **请求参数（Query 参数）**
@@ -76,7 +76,7 @@ GET http://localhost:8088/fms/ftp/downloadPath
 
 **示例请求**
 ```
-GET http://localhost:8088/fms/ftp/downloadPath?filePath=uploads/合格证/file.txt
+GET http://localhost:8088/fms/ftp/download?filePath=uploads/合格证/file.txt
 ```
 
 **示例响应（成功）**

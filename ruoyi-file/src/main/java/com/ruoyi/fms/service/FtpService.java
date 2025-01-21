@@ -8,8 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * FtpService 负责处理与 FTP 服务器的连接、上传、下载和删除文件操作。
@@ -110,6 +115,71 @@ public class FtpService {
         }
     }
 
+    /**
+     * 处理文件流输出，用于下载或在线预览文件
+     *
+     * @param remoteFolder 文件所在远程目录（例如 "uploads/合格证"）
+     * @param fileName     文件名（例如 "file.txt"）
+     * @param isPreview    是否在线预览（true：预览，用 inline ；false：下载，用 attachment）
+     * @param response     HttpServletResponse 用于输出文件流
+     */
+    public void streamFile(String remoteFolder, String fileName, boolean isPreview, HttpServletResponse response) {
+        // 拼接本地临时文件路径（确保 ftpConfig.getTempDir() 已正确配置路径）
+        String localFilePath = getTempDir() + fileName;
+        try {
+            // 调用已有的 FTP 下载方法，从 FTP 服务器下载文件到本地
+            boolean success = downloadFile(remoteFolder, fileName, localFilePath);
+            if (!success) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.getWriter().write("文件下载失败或不存在");
+                return;
+            }
+            // 根据模式设置响应头
+            if (isPreview) {
+                // 根据扩展名设置 Content-Type（实际项目中可使用更完整的解析方法）
+                String contentType = "application/octet-stream";
+                String lowerName = fileName.toLowerCase();
+                if (lowerName.endsWith(".png")) {
+                    contentType = "image/png";
+                } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+                    contentType = "image/jpeg";
+                } else if (lowerName.endsWith(".gif")) {
+                    contentType = "image/gif";
+                } else if (lowerName.endsWith(".pdf")) {
+                    contentType = "application/pdf";
+                } else if (lowerName.endsWith(".txt")) {
+                    contentType = "text/plain";
+                }
+                response.setContentType(contentType);
+                response.setHeader("Content-Disposition", "inline; filename=" + URLEncoder.encode(fileName, "UTF-8"));
+            } else {
+                // 下载模式
+                response.setContentType("application/octet-stream");
+                response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\"");
+            }
+            // 将本地文件流写入 HTTP 响应
+            try (InputStream is = Files.newInputStream(Paths.get(localFilePath));
+                 OutputStream os = response.getOutputStream()) {
+                StreamUtils.copy(is, os);
+            }
+        } catch (Exception e) {
+            try {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                String mode = isPreview ? "预览" : "下载";
+                response.getWriter().write(mode + "出现异常: " + e.getMessage());
+                log.error(mode + "过程中异常", e);
+            } catch (IOException ex) {
+                log.error("返回异常信息时出现错误", ex);
+            }
+        } finally {
+            // 清理本地临时文件
+            try {
+                Files.deleteIfExists(Paths.get(localFilePath));
+            } catch (IOException ex) {
+                log.warn("删除临时文件失败: " + localFilePath, ex);
+            }
+        }
+    }
     /**
      * 下载文件从 FTP 服务器。
      *

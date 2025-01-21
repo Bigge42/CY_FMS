@@ -9,15 +9,11 @@ import com.ruoyi.fms.service.FtpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URLEncoder;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -209,7 +205,7 @@ public class FtpController {
 
 
     /**
-     * 下载文件接口 - 通过相对路径，直接返回文件流
+     * 下载文件接口 - 附件下载模式
      *
      * @param filePath 相对路径，如 "uploads/合格证/file.txt"
      * @param response HttpServletResponse，用于输出文件流
@@ -218,58 +214,12 @@ public class FtpController {
     @GetMapping("/download")
     public void downloadFile(@RequestParam("filePath") String filePath,
                              HttpServletResponse response) {
-        try {
-            // 1. 分割出 folder & fileName
-            int lastSlashIndex = filePath.lastIndexOf('/');
-            if (lastSlashIndex < 0) {
-                // 如果没有'/'，说明传入有误，这里可自行处理
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().write("filePath 格式不正确");
-                return;
-            }
-            String folder = filePath.substring(0, lastSlashIndex);
-            String fileName = filePath.substring(lastSlashIndex + 1);
-
-            // 2. 本地暂存路径
-            String localFilePath = ftpService.getTempDir() + fileName;
-
-            // 3. 调用 FtpService 下载
-            boolean success = ftpService.downloadFile(folder, fileName, localFilePath);
-            if (!success) {
-                // 下载失败就写一个提示
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                response.getWriter().write("文件下载失败或不存在");
-                return;
-            }
-
-            // 4. 设置响应头
-            // Content-Type 根据文件后缀而定，简化处理成通用的application/octet-stream
-            response.setContentType("application/octet-stream");
-            // 设置下载弹窗的文件名，这里直接使用原始 fileName
-            // 如果需要处理中文文件名等，请进行URL编码
-            response.setHeader("Content-Disposition",
-                    "attachment;filename=\"" + fileName + "\"");
-
-            // 5. 将本地文件流写入 response 输出流
-            try (java.io.InputStream is = Files.newInputStream(Paths.get(localFilePath))) {
-                StreamUtils.copy(is, response.getOutputStream());
-            }
-
-            // 6. 如果需要，写完后清理本地缓存文件
-            Files.deleteIfExists(Paths.get(localFilePath));
-
-        } catch (Exception e) {
-            try {
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("下载出现异常: " + e.getMessage());
-            } catch (Exception ex) {
-                // 忽略写错误信息时的异常
-            }
-        }
+        // 将 filePath 解析和流输出的业务交由 Service 层处理，isPreview 为 false 表示附件下载
+        processFile(filePath, response, false);
     }
 
     /**
-     * 浏览文件接口 - 通过相对路径，直接返回文件流
+     * 在线预览接口 - 内联预览模式
      *
      * @param filePath 相对路径，如 "uploads/合格证/file.txt"
      * @param response HttpServletResponse，用于输出文件流
@@ -278,67 +228,33 @@ public class FtpController {
     @GetMapping("/preview")
     public void previewFile(@RequestParam("filePath") String filePath,
                             HttpServletResponse response) {
-        try {
-            // 1. 解析 filePath，分离出文件夹和文件名
-            int lastSlashIndex = filePath.lastIndexOf('/');
-            if (lastSlashIndex < 0) {
+        // 将 filePath 解析和流输出的业务交由 Service 层处理，isPreview 为 true 表示在线预览
+        processFile(filePath, response, true);
+    }
+
+    /**
+     * 公共方法：解析请求参数并调用 Service 层流文件输出方法
+     *
+     * @param filePath   文件的相对路径
+     * @param response   HttpServletResponse
+     * @param isPreview  是否预览模式（true：在线预览；false：附件下载）
+     */
+    private void processFile(String filePath, HttpServletResponse response, boolean isPreview) {
+        // 解析 filePath，提取 remoteFolder 和 fileName
+        int lastSlashIndex = filePath.lastIndexOf('/');
+        if (lastSlashIndex < 0) {
+            try {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().write("filePath 格式不正确");
-                return;
+            } catch (Exception e) {
+                log.error("处理错误响应时异常", e);
             }
-            String remoteFolder = filePath.substring(0, lastSlashIndex);
-            String fileName = filePath.substring(lastSlashIndex + 1);
-
-            // 2. 本地暂存路径（可以使用临时目录）
-            String localFilePath = ftpService.getTempDir() + fileName;
-
-            // 3. 下载文件到本地（与下载接口类似）
-            boolean success = ftpService.downloadFile(remoteFolder, fileName, localFilePath);
-            if (!success) {
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                response.getWriter().write("文件下载失败或不存在");
-                return;
-            }
-
-            // 4. 根据文件类型设置 Content-Type
-            // 例如，这里简单根据文件扩展名决定，实际可使用更完善的方式。
-            String contentType = "application/octet-stream";
-            if (fileName.endsWith(".png")) {
-                contentType = "image/png";
-            } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
-                contentType = "image/jpeg";
-            } else if (fileName.endsWith(".gif")) {
-                contentType = "image/gif";
-            } else if (fileName.endsWith(".pdf")) {
-                contentType = "application/pdf";
-            } else if (fileName.endsWith(".txt")) {
-                contentType = "text/plain";
-            }
-            response.setContentType(contentType);
-
-            // 5. 设置响应头，采用 inline 使浏览器直接显示，不弹出下载对话框
-            response.setHeader("Content-Disposition", "inline; filename=" + URLEncoder.encode(fileName, "UTF-8"));
-
-            // 6. 将本地文件流写入 HTTP 响应
-            try (InputStream inputStream = new FileInputStream(localFilePath);
-                 OutputStream outputStream = response.getOutputStream()) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-            }
-
-            // 7. 删除本地临时文件（根据实际情况选择是否删除）
-            new File(localFilePath).delete();
-        } catch (Exception e) {
-            try {
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("预览出现异常: " + e.getMessage());
-            } catch (IOException ex) {
-                log.error("无法返回异常信息到客户端", ex);
-            }
+            return;
         }
+        String remoteFolder = filePath.substring(0, lastSlashIndex);
+        String fileName = filePath.substring(lastSlashIndex + 1);
+        // 调用 service 层处理
+        ftpService.streamFile(remoteFolder, fileName, isPreview, response);
     }
     /**
      * 删除文件接口
