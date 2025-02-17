@@ -314,21 +314,21 @@ public class FtpController {
     public static class Response {
         private int code;
         private String msg;
-        private String url;
+        private String data;
 
         public Response(int code, String msg) {
             this.code = code;
             this.msg = msg;
         }
 
-        public Response(int code, String msg, String url) {
+        public Response(int code, String msg, String data) {
             this.code = code;
             this.msg = msg;
-            this.url = url;
+            this.data = data;
         }
 
-        public static Response success(String msg, String url) {
-            return new Response(200, msg, url);
+        public static Response success(String msg, String data) {
+            return new Response(200, msg, data);
         }
 
         public static Response success(String msg) {
@@ -355,8 +355,8 @@ public class FtpController {
             this.msg = msg;
         }
 
-        public String getUrl() {
-            return url;
+        public String getData() {
+            return data;
         }
     }
 
