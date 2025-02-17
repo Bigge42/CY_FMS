@@ -37,7 +37,7 @@ CREATE TABLE CY_Folder (
 -- 创建 CY_FILE 合并表
 -- ===========================================
 CREATE TABLE CY_FILE (
-                         FileID INT AUTO_INCREMENT NOT NULL COMMENT '文件ID', -- 文件ID作为主键
+                         FileID VARCHAR(255) NOT NULL COMMENT '文件ID', -- 文件ID作为主键
                          FileName VARCHAR(255) NOT NULL COMMENT '文件名',
                          FolderID INT NOT NULL COMMENT '所属文件夹ID',
                          DocumentTypeID INT NULL COMMENT '文档类型ID',

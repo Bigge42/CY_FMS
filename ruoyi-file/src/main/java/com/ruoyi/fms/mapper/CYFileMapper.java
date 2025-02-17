@@ -6,8 +6,8 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface CYFileMapper {
 
-        @Insert("INSERT INTO CY_FILE(fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
-                "VALUES(#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{planTrackingNumber}, #{createdBy}, NOW(), #{fileURL})")
+        @Insert("INSERT INTO CY_FILE(fileID,fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
+                "VALUES(#{fileID},#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{planTrackingNumber}, #{createdBy}, NOW(), #{fileURL})")
         @Options(useGeneratedKeys = true, keyProperty = "fileID")
         int insertFile(CYFile file);
 
@@ -15,5 +15,5 @@ public interface CYFileMapper {
         CYFile findByFileNameAndMatchID(@Param("documentTypeName") String documentTypeName, @Param("matchID") Integer matchID);
 
         @Update("UPDATE CY_FILE SET deleteFlag = 1, updatedAt = NOW() WHERE fileID = #{fileID}")
-        int markAsDeleted(@Param("fileID") Integer fileID);
+        int markAsDeleted(@Param("fileID") String fileID);
 }

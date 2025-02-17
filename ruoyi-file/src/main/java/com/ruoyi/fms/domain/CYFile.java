@@ -3,7 +3,7 @@ package com.ruoyi.fms.domain;
 import java.util.Date;
 
 public class CYFile {
-    private Integer fileID;
+    private String fileID;
     private String fileName;
     private Integer folderID;
     private Integer documentTypeID;
@@ -21,11 +21,9 @@ public class CYFile {
     private String PlanTrackingNumber;
 
     // Getters and Setters
-    public Integer getFileID() {
-        return fileID;
-    }
+    public String getFileID(){return fileID;}
 
-    public void setFileID(Integer fileID) {
+    public void  setFileID(String fileID){
         this.fileID = fileID;
     }
 

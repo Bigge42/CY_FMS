@@ -4,7 +4,7 @@ import com.ruoyi.fms.config.FtpConfig;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPReply;
-import org.slf4j.Logger;
+import org.slf4j.Logger;    
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -179,7 +179,7 @@ public class FtpService {
                 log.warn("删除临时文件失败: " + localFilePath, ex);
             }
         }
-    }
+    }   
     /**
      * 下载文件从 FTP 服务器。
      *
