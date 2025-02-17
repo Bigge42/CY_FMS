@@ -141,30 +141,45 @@ public class FtpController {
     /**
      * 下载文件接口 - 附件下载模式
      *
-     * @param filePath 相对路径，如 "uploads/合格证/file.txt"
+     * @param fileId   文件ID，根据文件ID在数据库中查找对应的文件路径
      * @param response HttpServletResponse，用于输出文件流
      */
     @Anonymous
     @GetMapping("/download")
-    public void downloadFile(@RequestParam("filePath") String filePath,
+    public void downloadFile(@RequestParam("fileId") String fileId,
                              HttpServletResponse response) {
-        // 将 filePath 解析和流输出的业务交由 Service 层处理，isPreview 为 false 表示附件下载
+        // 根据 fileId 获取文件路径（例如从数据库中查询）
+        String filePath = fileService.getFilePathByFileId(fileId);
+        if(filePath == null) {
+            // 文件路径为空，返回错误提示或设置响应状态码
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+        // 调用通用处理方法，false 表示附件下载
         processFile(filePath, response, false);
     }
 
     /**
      * 在线预览接口 - 内联预览模式
      *
-     * @param filePath 相对路径，如 "uploads/合格证/file.txt"
+     * @param fileId   文件ID，根据文件ID在数据库中查找对应的文件路径
      * @param response HttpServletResponse，用于输出文件流
      */
     @Anonymous
     @GetMapping("/preview")
-    public void previewFile(@RequestParam("filePath") String filePath,
+    public void previewFile(@RequestParam("fileId") String fileId,
                             HttpServletResponse response) {
-        // 将 filePath 解析和流输出的业务交由 Service 层处理，isPreview 为 true 表示在线预览
+        // 根据 fileId 获取文件路径
+        String filePath = fileService.getFilePathByFileId(fileId);
+        if(filePath == null) {
+            // 文件路径为空，返回错误提示或设置响应状态码
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+        // 调用通用处理方法，true 表示在线预览
         processFile(filePath, response, true);
     }
+
 
 
     @Anonymous

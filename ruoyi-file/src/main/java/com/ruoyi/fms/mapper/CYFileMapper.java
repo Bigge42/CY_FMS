@@ -16,4 +16,7 @@ public interface CYFileMapper {
 
         @Update("UPDATE CY_FILE SET deleteFlag = 1, updatedAt = NOW() WHERE fileID = #{fileID}")
         int markAsDeleted(@Param("fileID") String fileID);
+
+        @Select("SELECT * FROM CY_FILE WHERE fileID = #{fileId} AND deleteFlag = 0")
+        CYFile selectByFileId(@Param("fileId") String fileId);
 }

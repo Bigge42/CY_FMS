@@ -104,4 +104,18 @@ public class FileService {
     }
 
 
+    /**
+     * 根据 fileId 查询数据库中对应文件记录，并返回文件的存储路径（例如 fileURL）
+     *
+     * @param fileId 文件ID
+     * @return 文件存储路径，如果未找到则返回 null
+     */
+
+    public String getFilePathByFileId(String fileId) {
+        CYFile cyFile = fileMapper.selectByFileId(fileId);
+        if (cyFile != null) {
+            return cyFile.getFileURL();
+        }
+        return null;
+    }
 }
