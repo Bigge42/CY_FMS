@@ -1,6 +1,7 @@
 package com.ruoyi.fms.controller;
 
 import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.fms.domain.CYFile;
 import com.ruoyi.fms.domain.CYFolder;
 import com.ruoyi.fms.service.FileService;
@@ -21,8 +22,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -108,7 +107,6 @@ public class FtpController {
      * @param file               上传的文件
      * @param documentTypeID     文档类型ID（必填）
      * @param matchID            匹配ID（必填）
-     * @param createdBy          创建人（必填）
      * @param planTrackingNumber 计划跟踪号（选填）
      * @return 上传结果，返回文件ID
      */
@@ -117,9 +115,8 @@ public class FtpController {
     public Response uploadFile(@RequestParam("file") MultipartFile file,
                                @RequestParam("DocumentTypeID") Integer documentTypeID,
                                @RequestParam("matchID") String matchID,
-                               @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
-                               @RequestParam("createdBy") String createdBy) throws UnsupportedEncodingException {
-        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, false, createdBy);
+                               @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
+        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, false);
     }
 
     /**
@@ -136,11 +133,9 @@ public class FtpController {
     public Response uploadFileToPdf(@RequestParam("file") MultipartFile file,
                                     @RequestParam("DocumentTypeID") Integer documentTypeID,
                                     @RequestParam("matchID") String matchID,
-                                    @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
-                                    @RequestParam("createdBy") String createdBy) throws UnsupportedEncodingException {  // 新增 createdBy 参数
-        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, true, createdBy);
+                                    @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
+        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, true);
     }
-
 
 
 
@@ -377,12 +372,11 @@ public class FtpController {
      * @param convertToPdf       是否需要将文件转换为 PDF（true 表示转换，false 表示直接上传原文件）
      * @return Response，包含文件ID或错误信息
      */
-    public Response processFileUpload(MultipartFile file,
-                                      Integer documentTypeID,
-                                      String matchID,
-                                      String planTrackingNumber,
-                                      boolean convertToPdf,
-                                      String createdBy) throws UnsupportedEncodingException {
+    private Response processFileUpload(MultipartFile file,
+                                       Integer documentTypeID,
+                                       String matchID,
+                                       String planTrackingNumber,
+                                       boolean convertToPdf) {
         // 参数校验
         if (documentTypeID == null) {
             log.warn("DocumentTypeID 不能为空");
@@ -412,27 +406,24 @@ public class FtpController {
         if (originalFileName == null) {
             originalFileName = "unknown";
         }
-
-        // 对文件名进行 URL 编码
-        String encodedFileName = URLEncoder.encode(originalFileName, StandardCharsets.UTF_8.toString());
-
         // 去除原始扩展名（后续根据是否转换决定扩展名）
-        int dotIndex = encodedFileName.lastIndexOf('.');
+        int dotIndex = originalFileName.lastIndexOf('.');
         if (dotIndex != -1) {
-            encodedFileName = encodedFileName.substring(0, dotIndex);
+            originalFileName = originalFileName.substring(0, dotIndex);
         }
 
         // 根据是否转换决定新文件名
         String newFileName;
         if (convertToPdf) {
-            newFileName = encodedFileName + "_" + timestamp + ".pdf";
+            newFileName = originalFileName + "_" + timestamp + ".pdf";
         } else {
+            // 若不转换，保留原扩展名（通过 MultipartFile 重新获取原始扩展名）
             String ext = "";
             String ori = file.getOriginalFilename();
             if (ori != null && ori.lastIndexOf('.') != -1) {
                 ext = ori.substring(ori.lastIndexOf('.'));
             }
-            newFileName = encodedFileName + "_" + timestamp + ext;
+            newFileName = originalFileName + "_" + timestamp + ext;
         }
 
         // 获取临时存储目录（通过 ftpService 提供）
@@ -444,7 +435,7 @@ public class FtpController {
         }
 
         // 定义本地文件路径：如果转换为 PDF，需要先保存原始文件再转换，否则直接保存目标文件
-        String localOriginalPath = tempDir + encodedFileName + "_" + timestamp;
+        String localOriginalPath = tempDir + originalFileName + "_" + timestamp;
         String localTargetPath = tempDir + newFileName;
 
         try {
@@ -471,16 +462,16 @@ public class FtpController {
             CYFolder folder = folderService.findOrCreateFolder(documentTypeName, "system");
             String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
 
-            // 上传目标文件到 FTP 服务器，使用URL编码后的文件名
-            boolean uploadResult = ftpService.uploadFile(localTargetPath, remoteFolderPath, encodedFileName + "_" + timestamp + (convertToPdf ? ".pdf" : getExtension(file)));
+            // 上传目标文件到 FTP 服务器
+            boolean uploadResult = ftpService.uploadFile(localTargetPath, remoteFolderPath, newFileName);
             if (!uploadResult) {
                 log.error("文件上传到 FTP 失败: {}", newFileName);
                 return Response.error("文件上传到 FTP 失败");
             }
             log.info("文件成功上传到 FTP: {}", newFileName);
 
-            // 构建文件 URL（解码文件名以显示中文）
-            String fileURL = ftpService.getFtpUrl(remoteFolderPath, encodedFileName + "_" + timestamp + (convertToPdf ? ".pdf" : getExtension(file)));
+            // 构建文件 URL
+            String fileURL = ftpService.getFtpUrl(remoteFolderPath, newFileName);
             if (fileURL == null) {
                 log.warn("构建文件 URL 失败");
                 return Response.error("构建文件 URL 失败");
@@ -489,13 +480,13 @@ public class FtpController {
             // 构建文件记录对象
             CYFile cyFile = new CYFile();
             // 记录文件名按转换后或原始文件名保存
-            cyFile.setFileName(URLDecoder.decode(encodedFileName + "_" + timestamp, StandardCharsets.UTF_8.toString())); // 解码为中文显示
+            cyFile.setFileName(newFileName);
             cyFile.setFolderID(folder.getFolderID());
             cyFile.setDocumentTypeName(documentTypeName);
             cyFile.setDocumentTypeID(documentTypeID);
             cyFile.setMatchID(matchID);
             cyFile.setVersionNumber(timestamp);
-            cyFile.setCreatedBy(createdBy);  // 设置 createdBy
+            cyFile.setCreatedBy("system");
             cyFile.setFileURL(fileURL);
             cyFile.setPlanTrackingNumber(planTrackingNumber);
 
@@ -530,16 +521,6 @@ public class FtpController {
             log.error("文件上传或处理失败: {}", e.getMessage(), e);
             return Response.error("文件上传或处理失败: " + e.getMessage());
         }
-    }
-
-    // 获取文件扩展名
-    private String getExtension(MultipartFile file) {
-        String ext = "";
-        String ori = file.getOriginalFilename();
-        if (ori != null && ori.lastIndexOf('.') != -1) {
-            ext = ori.substring(ori.lastIndexOf('.'));
-        }
-        return ext;
     }
 
     /**
@@ -597,6 +578,20 @@ public class FtpController {
             // 记录转换错误信息
             log.error("convertToPdf 出现异常: {}", e.getMessage(), e);
             return false;
+        }
+    }
+
+    // 查询接口，根据 matchID 和 documentTypeID 返回 fileID 集合
+    @Anonymous
+    @GetMapping("/getFileIDs")
+    public AjaxResult getFileIDs(@RequestParam("matchID") String matchID,
+                                 @RequestParam("documentTypeID") Integer documentTypeID) {
+        try {
+            // 调用 service 层方法来获取文件ID集合
+            List<String> fileIDs = fileService.getFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
+            return AjaxResult.success(fileIDs);
+        } catch (Exception e) {
+            return AjaxResult.error("查询文件ID失败", e.getMessage());
         }
     }
 }

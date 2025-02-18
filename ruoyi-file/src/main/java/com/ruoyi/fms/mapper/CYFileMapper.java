@@ -3,8 +3,26 @@ package com.ruoyi.fms.mapper;
 import com.ruoyi.fms.domain.CYFile;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface CYFileMapper {
+
+
+        // 根据 matchID 和 documentTypeID 查询文件ID集合
+        @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND documentTypeID = #{documentTypeID} AND deleteFlag = 0")
+        List<String> findFileIDsByMatchIDAndDocumentTypeID(@Param("matchID") String matchID,
+                                                           @Param("documentTypeID") Integer documentTypeID);
+        // 根据 fileID 查找文件记录
+        @Select("SELECT * FROM cy_file WHERE fileID = #{fileID}")
+        CYFile findFileById(String fileID);
+
+        @Update("UPDATE cy_file SET updatedBy = #{updatedBy}, updatedAt = #{updatedAt}, fileURL = #{fileURL}, deleteFlag = #{deleteFlag} WHERE fileID = #{fileID}")
+        int updateFile(@Param("fileID") String fileID,
+                       @Param("updatedBy") String updatedBy,
+                       @Param("updatedAt") String updatedAt,
+                       @Param("fileURL") String fileURL,
+                       @Param("deleteFlag") boolean deleteFlag);
 
         @Insert("INSERT INTO CY_FILE(fileID,fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
                 "VALUES(#{fileID},#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{planTrackingNumber}, #{createdBy}, NOW(), #{fileURL})")

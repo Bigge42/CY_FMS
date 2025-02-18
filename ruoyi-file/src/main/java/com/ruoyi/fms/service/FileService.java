@@ -2,6 +2,8 @@ package com.ruoyi.fms.service;
 
 import com.ruoyi.fms.domain.CYFile;
 import com.ruoyi.fms.mapper.CYFileMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,8 @@ public class FileService {
 
     @Autowired
     private CYFileMapper fileMapper;
+    private static final Logger log = LoggerFactory.getLogger(FileService.class);
+
 
     /**
      * 保存文件记录到数据库
@@ -117,5 +121,58 @@ public class FileService {
             return cyFile.getFileURL();
         }
         return null;
+    }
+
+    // 更新文件记录的方法
+    public int updateFileRecord(CYFile cyFile) {
+        try {
+            // 确保文件ID存在
+            if (cyFile.getFileID() == null) {
+                log.warn("文件ID为空，无法更新文件记录");
+                return 0;  // 返回0表示没有更新
+            }
+
+            // 将更新日期转换为 MySQL 可接受的格式
+            String updatedAt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+
+            // 调用CYFileMapper来更新文件记录
+            int updateCount = fileMapper.updateFile(cyFile.getFileID(),
+                    cyFile.getUpdatedBy(),
+                    updatedAt,
+                    cyFile.getFileURL(),
+                    cyFile.getDeleteFlag());
+
+            // 记录日志
+            if (updateCount > 0) {
+                log.info("文件记录更新成功: FileID={}", cyFile.getFileID());
+            } else {
+                log.warn("未能更新文件记录: FileID={}", cyFile.getFileID());
+            }
+
+            return updateCount;
+        } catch (Exception e) {
+            log.error("更新文件记录失败: {}", e.getMessage(), e);
+            return 0;  // 返回0表示没有更新
+        }
+    }
+
+    // 根据 fileID 查找文件记录
+    public CYFile findFileById(String fileID) {
+        try {
+            // 调用 CYFileMapper 查找文件
+            CYFile cyFile = fileMapper.findFileById(fileID);
+            if (cyFile == null) {
+                log.warn("未找到对应的文件记录: FileID={}", fileID);
+            }
+            return cyFile;
+        } catch (Exception e) {
+            log.error("查找文件记录失败: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    // 根据 matchID 和 documentTypeID 查询文件ID集合
+    public List<String> getFileIDsByMatchIDAndDocumentTypeID(String matchID, Integer documentTypeID) {
+        return fileMapper.findFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
     }
 }
