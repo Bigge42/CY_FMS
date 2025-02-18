@@ -113,6 +113,29 @@ public class ProxyController {
             String strData = HttpUtils.sendPost(targetUrl, "");
             JSONObject jsonData = JSON.parseObject(strData);
 
+            if (jsonData == null) {
+                return AjaxResult.error("返回的JSON数据为空");
+            }
+
+            // 如果GXMX不存在，合并JRKG和JRWG为GXMX
+            if (!jsonData.containsKey("GXMX")) {
+                if (jsonData.containsKey("JRKG") && jsonData.containsKey("JRWG")) {
+                    // 获取JRKG和JRWG数据并合并为GXMX
+                    JSONArray jrkgArray = jsonData.getJSONArray("JRKG");
+                    JSONArray jrwgArray = jsonData.getJSONArray("JRWG");
+
+                    // 合并数组
+                    JSONArray gxmxArray = new JSONArray();
+                    gxmxArray.addAll(jrkgArray);
+                    gxmxArray.addAll(jrwgArray);
+
+                    // 将合并后的数组放入jsonData中
+                    jsonData.put("GXMX", gxmxArray);
+                } else {
+                    return AjaxResult.error("返回数据中缺少'JRKG'和'JRWG'，无法合并为'GXMX'");
+                }
+            }
+
             // 获取GXMX数组中abnormalState为异常的ERPPlanOrderId列表
             JSONArray gxmxArray = jsonData.getJSONArray("GXMX");
             List<String> abnormalERPPlanOrderIds = gxmxArray.stream()
@@ -122,6 +145,10 @@ public class ProxyController {
                     .collect(Collectors.toList());
 
             // 过滤ZPYCLB数组中FMTONO与abnormalERPPlanOrderIds相同的项
+            if (!jsonData.containsKey("ZPYCLB")) {
+                return AjaxResult.error("返回数据中缺少'ZPYCLB'键");
+            }
+
             JSONArray zpyclbArray = jsonData.getJSONArray("ZPYCLB");
             List<JSONObject> filteredZPYCLB = zpyclbArray.stream()
                     .map(item -> (JSONObject) item)
@@ -139,4 +166,5 @@ public class ProxyController {
             return AjaxResult.error("请求目标接口时发生错误：" + e.getMessage());
         }
     }
+
 }
