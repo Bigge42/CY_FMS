@@ -8,6 +8,14 @@ import java.util.List;
 @Mapper
 public interface CYFileMapper {
 
+        // 根据 matchID 查询文件ID集合
+        @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND deleteFlag = 0")
+        List<String> findFileIDsByMatchID(@Param("matchID") String matchID);
+
+        // 根据 documentTypeID 查询文件ID集合
+        @Select("SELECT fileID FROM cy_file WHERE documentTypeID = #{documentTypeID} AND deleteFlag = 0")
+        List<String> findFileIDsByDocumentTypeID(@Param("documentTypeID") Integer documentTypeID);
+
 
         // 根据 matchID 和 documentTypeID 查询文件ID集合
         @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND documentTypeID = #{documentTypeID} AND deleteFlag = 0")

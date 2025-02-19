@@ -175,4 +175,14 @@ public class FileService {
     public List<String> getFileIDsByMatchIDAndDocumentTypeID(String matchID, Integer documentTypeID) {
         return fileMapper.findFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
     }
+
+    public List<String> getFileIDsByMatchID(String matchID) {
+        // 根据 matchID 查询文件ID
+        return fileMapper.findFileIDsByMatchID(matchID);
+    }
+
+    public List<String> getFileIDsByDocumentTypeID(Integer documentTypeID) {
+        // 根据 documentTypeID 查询文件ID
+        return fileMapper.findFileIDsByDocumentTypeID(documentTypeID);
+    }
 }

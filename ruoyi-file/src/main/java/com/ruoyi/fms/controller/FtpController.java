@@ -108,6 +108,7 @@ public class FtpController {
      * @param documentTypeID     文档类型ID（必填）
      * @param matchID            匹配ID（必填）
      * @param planTrackingNumber 计划跟踪号（选填）
+     * @param createdBy          创建人（必填）
      * @return 上传结果，返回文件ID
      */
     @Anonymous
@@ -115,8 +116,9 @@ public class FtpController {
     public Response uploadFile(@RequestParam("file") MultipartFile file,
                                @RequestParam("DocumentTypeID") Integer documentTypeID,
                                @RequestParam("matchID") String matchID,
-                               @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
-        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, false);
+                               @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
+                               @RequestParam("createdBy") String createdBy) {
+        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, false, createdBy);
     }
 
     /**
@@ -126,6 +128,7 @@ public class FtpController {
      * @param documentTypeID     文档类型ID（必填）
      * @param matchID            匹配ID（必填）
      * @param planTrackingNumber 计划跟踪号（选填）
+     * @param createdBy          创建人（必填）
      * @return 上传结果，返回文件ID
      */
     @Anonymous
@@ -133,9 +136,11 @@ public class FtpController {
     public Response uploadFileToPdf(@RequestParam("file") MultipartFile file,
                                     @RequestParam("DocumentTypeID") Integer documentTypeID,
                                     @RequestParam("matchID") String matchID,
-                                    @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
-        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, true);
+                                    @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
+                                    @RequestParam("createdBy") String createdBy) {
+        return processFileUpload(file, documentTypeID, matchID, planTrackingNumber, true, createdBy);
     }
+
 
 
 
@@ -376,7 +381,8 @@ public class FtpController {
                                        Integer documentTypeID,
                                        String matchID,
                                        String planTrackingNumber,
-                                       boolean convertToPdf) {
+                                       boolean convertToPdf,
+                                       String createdBy) {
         // 参数校验
         if (documentTypeID == null) {
             log.warn("DocumentTypeID 不能为空");
@@ -486,7 +492,7 @@ public class FtpController {
             cyFile.setDocumentTypeID(documentTypeID);
             cyFile.setMatchID(matchID);
             cyFile.setVersionNumber(timestamp);
-            cyFile.setCreatedBy("system");
+            cyFile.setCreatedBy(createdBy);
             cyFile.setFileURL(fileURL);
             cyFile.setPlanTrackingNumber(planTrackingNumber);
 
@@ -581,17 +587,34 @@ public class FtpController {
         }
     }
 
-    // 查询接口，根据 matchID 和 documentTypeID 返回 fileID 集合
     @Anonymous
     @GetMapping("/getFileIDs")
-    public AjaxResult getFileIDs(@RequestParam("matchID") String matchID,
-                                 @RequestParam("documentTypeID") Integer documentTypeID) {
+    public AjaxResult getFileIDs(@RequestParam(value = "matchID", required = false) String matchID,
+                                 @RequestParam(value = "documentTypeID", required = false) Integer documentTypeID) {
         try {
-            // 调用 service 层方法来获取文件ID集合
-            List<String> fileIDs = fileService.getFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
+            // 参数校验，至少提供一个参数
+            if (matchID == null && documentTypeID == null) {
+                return AjaxResult.error("至少提供 matchID 或 documentTypeID 参数");
+            }
+
+            List<String> fileIDs;
+
+            // 根据不同的参数组合来查询文件ID
+            if (matchID != null && documentTypeID != null) {
+                // 同时提供 matchID 和 documentTypeID
+                fileIDs = fileService.getFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
+            } else if (matchID != null) {
+                // 只提供 matchID
+                fileIDs = fileService.getFileIDsByMatchID(matchID);
+            } else {
+                // 只提供 documentTypeID
+                fileIDs = fileService.getFileIDsByDocumentTypeID(documentTypeID);
+            }
+
             return AjaxResult.success(fileIDs);
         } catch (Exception e) {
             return AjaxResult.error("查询文件ID失败", e.getMessage());
         }
     }
+
 }
