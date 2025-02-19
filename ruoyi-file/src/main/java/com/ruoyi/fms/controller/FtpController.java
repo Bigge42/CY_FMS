@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -482,6 +483,10 @@ public class FtpController {
             if (fileURL == null) {
                 log.warn("构建文件 URL 失败");
                 return Response.error("构建文件 URL 失败");
+            }
+            // 使用 URLDecoder 解码 URL
+            if (fileURL != null) {
+                fileURL = URLDecoder.decode(fileURL, "UTF-8");
             }
 
             // 构建文件记录对象
