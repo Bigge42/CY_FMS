@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -434,106 +435,114 @@ public class FtpController {
             newFileName = originalFileName + "_" + timestamp + ext;
         }
 
-        // 获取临时存储目录（通过 ftpService 提供）
-        String tempDir = ftpService.getTempDir();
-        File tempDirectory = new File(tempDir);
-        if (!tempDirectory.exists() && !tempDirectory.mkdirs()) {
-            log.warn("无法创建临时目录: {}", tempDir);
-            return Response.error("无法创建临时目录: " + tempDir);
-        }
-
-        // 定义本地文件路径：如果转换为 PDF，需要先保存原始文件再转换，否则直接保存目标文件
-        String localOriginalPath = tempDir + originalFileName + "_" + timestamp;
-        String localTargetPath = tempDir + newFileName;
-
+        // URL 编码文件名部分，避免中文字符导致问题
         try {
-            if (convertToPdf) {
-                // 保存上传的原始文件到本地，用于转换
-                File localOriginalFile = new File(localOriginalPath);
-                file.transferTo(localOriginalFile);
-                log.info("原始文件保存到本地临时路径: {}", localOriginalPath);
+            // 只对文件名进行编码，保留文件夹路径不编码
+            String encodedFileName = URLEncoder.encode(newFileName, StandardCharsets.UTF_8.toString());
+            log.info("文件名经过 URL 编码处理: {}", encodedFileName);
 
-                // 调用转换方法，将原始文件转换为 PDF
-                boolean conversionResult = convertToPdf(localOriginalFile, new File(localTargetPath));
-                if (!conversionResult) {
-                    log.error("文件转换为 PDF 失败");
-                    return Response.error("文件转换为 PDF 失败");
+            // 获取临时存储目录（通过 ftpService 提供）
+            String tempDir = ftpService.getTempDir();
+            File tempDirectory = new File(tempDir);
+            if (!tempDirectory.exists() && !tempDirectory.mkdirs()) {
+                log.warn("无法创建临时目录: {}", tempDir);
+                return Response.error("无法创建临时目录: " + tempDir);
+            }
+
+            // 定义本地文件路径：如果转换为 PDF，需要先保存原始文件再转换，否则直接保存目标文件
+            String localOriginalPath = tempDir + originalFileName + "_" + timestamp;
+            String localTargetPath = tempDir + encodedFileName;
+
+            try {
+                if (convertToPdf) {
+                    // 保存上传的原始文件到本地，用于转换
+                    File localOriginalFile = new File(localOriginalPath);
+                    file.transferTo(localOriginalFile);
+                    log.info("原始文件保存到本地临时路径: {}", localOriginalPath);
+
+                    // 调用转换方法，将原始文件转换为 PDF
+                    boolean conversionResult = convertToPdf(localOriginalFile, new File(localTargetPath));
+                    if (!conversionResult) {
+                        log.error("文件转换为 PDF 失败");
+                        return Response.error("文件转换为 PDF 失败");
+                    }
+                    log.info("文件成功转换为 PDF: {}", localTargetPath);
+                } else {
+                    // 不转换：直接将上传的文件保存到目标路径
+                    file.transferTo(new File(localTargetPath));
+                    log.info("文件保存到本地临时路径: {}", localTargetPath);
                 }
-                log.info("文件成功转换为 PDF: {}", localTargetPath);
-            } else {
-                // 不转换：直接将上传的文件保存到目标路径
-                file.transferTo(new File(localTargetPath));
-                log.info("文件保存到本地临时路径: {}", localTargetPath);
+
+                // 查找或创建对应的文件夹（例如以文档类型名称命名）
+                CYFolder folder = folderService.findOrCreateFolder(documentTypeName, "system");
+                String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
+
+                // 上传目标文件到 FTP 服务器
+                boolean uploadResult = ftpService.uploadFile(localTargetPath, remoteFolderPath, encodedFileName);
+                if (!uploadResult) {
+                    log.error("文件上传到 FTP 失败: {}", encodedFileName);
+                    return Response.error("文件上传到 FTP 失败");
+                }
+                log.info("文件成功上传到 FTP: {}", encodedFileName);
+
+                // 构建文件 URL，保留路径部分不编码
+                String fileURL = ftpService.getFtpUrl(remoteFolderPath, encodedFileName);
+                if (fileURL == null) {
+                    log.warn("构建文件 URL 失败");
+                    return Response.error("构建文件 URL 失败");
+                }
+
+                // 构建文件记录对象
+                CYFile cyFile = new CYFile();
+                cyFile.setFileName(encodedFileName);
+                cyFile.setFolderID(folder.getFolderID());
+                cyFile.setDocumentTypeName(documentTypeName);
+                cyFile.setDocumentTypeID(documentTypeID);
+                cyFile.setMatchID(matchID);
+                cyFile.setVersionNumber(timestamp);
+                cyFile.setCreatedBy(createdBy);
+                cyFile.setFileURL(fileURL);
+                cyFile.setPlanTrackingNumber(planTrackingNumber);
+
+                // 调用服务层生成文件ID，并设置到记录中
+                String fileID = fileService.generateFileID(documentTypeID);
+                cyFile.setFileID(fileID);
+
+                // 保存文件记录到数据库
+                int insertResult = fileService.saveFileRecord(cyFile);
+                if (insertResult <= 0) {
+                    log.warn("数据库插入文件记录失败");
+                    return Response.error("数据库插入文件记录失败");
+                }
+                log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}, 文件ID={}",
+                        cyFile.getFileName(), folder.getFolderCode(), cyFile.getFileID());
+
+                // 清理本地临时文件
+                if (convertToPdf) {
+                    File origFile = new File(localOriginalPath);
+                    File pdfFile = new File(localTargetPath);
+                    boolean deletedOrig = origFile.delete();
+                    boolean deletedPdf = pdfFile.delete();
+                    log.info("临时文件删除结果: 原始文件删除{}，PDF文件删除{}", deletedOrig ? "成功" : "失败", deletedPdf ? "成功" : "失败");
+                } else {
+                    boolean deleted = new File(localTargetPath).delete();
+                    log.info("临时文件删除{}", deleted ? "成功" : "失败");
+                }
+
+                return Response.success("文件上传成功并已存储到数据库", cyFile.getFileID());
+            } catch (Exception e) {
+                log.error("文件上传或处理失败: {}", e.getMessage(), e);
+                return Response.error("文件上传或处理失败: " + e.getMessage());
             }
-
-            // 查找或创建对应的文件夹（例如以文档类型名称命名）
-            CYFolder folder = folderService.findOrCreateFolder(documentTypeName, "system");
-            String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
-
-            // 上传目标文件到 FTP 服务器
-            boolean uploadResult = ftpService.uploadFile(localTargetPath, remoteFolderPath, newFileName);
-            if (!uploadResult) {
-                log.error("文件上传到 FTP 失败: {}", newFileName);
-                return Response.error("文件上传到 FTP 失败");
-            }
-            log.info("文件成功上传到 FTP: {}", newFileName);
-
-            // 构建文件 URL
-            String fileURL = ftpService.getFtpUrl(remoteFolderPath, newFileName);
-            if (fileURL == null) {
-                log.warn("构建文件 URL 失败");
-                return Response.error("构建文件 URL 失败");
-            }
-            // 使用 URLDecoder 解码 URL
-            if (fileURL != null) {
-                fileURL = URLDecoder.decode(fileURL, "UTF-8");
-            }
-
-            // 构建文件记录对象
-            CYFile cyFile = new CYFile();
-            // 记录文件名按转换后或原始文件名保存
-            cyFile.setFileName(newFileName);
-            cyFile.setFolderID(folder.getFolderID());
-            cyFile.setDocumentTypeName(documentTypeName);
-            cyFile.setDocumentTypeID(documentTypeID);
-            cyFile.setMatchID(matchID);
-            cyFile.setVersionNumber(timestamp);
-            cyFile.setCreatedBy(createdBy);
-            cyFile.setFileURL(fileURL);
-            cyFile.setPlanTrackingNumber(planTrackingNumber);
-
-            // 调用服务层生成文件ID，并设置到记录中
-            String fileID = fileService.generateFileID(documentTypeID);
-            cyFile.setFileID(fileID);
-
-            // 保存文件记录到数据库
-            int insertResult = fileService.saveFileRecord(cyFile);
-            if (insertResult <= 0) {
-                log.warn("数据库插入文件记录失败");
-                return Response.error("数据库插入文件记录失败");
-            }
-            log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}, 文件ID={}",
-                    cyFile.getFileName(), folder.getFolderCode(), cyFile.getFileID());
-
-            // 清理本地临时文件
-            // 如果转换，则删除原始文件和转换后的 PDF；否则只删除保存的目标文件
-            if (convertToPdf) {
-                File origFile = new File(localOriginalPath);
-                File pdfFile = new File(localTargetPath);
-                boolean deletedOrig = origFile.delete();
-                boolean deletedPdf = pdfFile.delete();
-                log.info("临时文件删除结果: 原始文件删除{}，PDF文件删除{}", deletedOrig ? "成功" : "失败", deletedPdf ? "成功" : "失败");
-            } else {
-                boolean deleted = new File(localTargetPath).delete();
-                log.info("临时文件删除{}", deleted ? "成功" : "失败");
-            }
-
-            return Response.success("文件上传成功并已存储到数据库", cyFile.getFileID());
         } catch (Exception e) {
-            log.error("文件上传或处理失败: {}", e.getMessage(), e);
-            return Response.error("文件上传或处理失败: " + e.getMessage());
+            log.error("文件名编码失败: {}", e.getMessage());
+            return Response.error("文件名编码失败");
         }
     }
+
+
+
+
 
     /**
      * 将原始文件转换为 PDF 文件

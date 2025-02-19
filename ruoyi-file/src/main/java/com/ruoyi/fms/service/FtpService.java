@@ -13,6 +13,7 @@ import org.springframework.util.StreamUtils;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -371,15 +372,18 @@ public class FtpService {
      */
     public String getFtpUrl(String remoteFolderPath, String remoteFileName) {
         try {
-            // 对路径中的空格进行简单处理（也可以根据需要进行更严格的编码）
-            String encodedPath = remoteFolderPath.replace(" ", "%20")
-                    + "/" + remoteFileName.replace(" ", "%20");
-            return encodedPath;
+            // 对文件名进行 URL 编码，空格替换为 '+'
+            String encodedFileName = remoteFileName.replace(" ", "+"); // 将空格替换为 '+'
+
+            // 返回组合后的路径，文件夹路径保持不变，只对文件名部分进行处理
+            return remoteFolderPath + "/" + encodedFileName;
         } catch (Exception e) {
             log.error("构建 FTP URL 失败: {}", e.getMessage(), e);
             return null;
         }
     }
+
+
 
 
     /**
