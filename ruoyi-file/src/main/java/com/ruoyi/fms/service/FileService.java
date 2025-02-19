@@ -12,6 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class FileService {
@@ -184,5 +185,16 @@ public class FileService {
     public List<String> getFileIDsByDocumentTypeID(Integer documentTypeID) {
         // 根据 documentTypeID 查询文件ID
         return fileMapper.findFileIDsByDocumentTypeID(documentTypeID);
+    }
+
+    /**
+     * 根据 matchID 和多个 documentTypeID 查询文件ID集合
+     *
+     * @param matchID         匹配ID
+     * @param documentTypeIDs 文档类型ID集合
+     * @return List<Map<String, Object>> 每个Map包含 documentTypeID 和 fileID
+     */
+    public List<Map<String, Object>> getFileIDsByMatchIDAndDocumentTypeIDs(String matchID, List<Integer> documentTypeIDs) {
+        return fileMapper.findFileIDsByMatchIDAndDocumentTypeIDs(matchID, documentTypeIDs);
     }
 }

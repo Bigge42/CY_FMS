@@ -4,9 +4,24 @@ import com.ruoyi.fms.domain.CYFile;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface CYFileMapper {
+
+        // 根据 matchID 和多个 documentTypeID 查询文件ID集合
+        @Select("<script>" +
+                "SELECT documentTypeID, fileID " +
+                "FROM cy_file " +
+                "WHERE matchID = #{matchID} " +
+                "AND documentTypeID IN " +
+                "<foreach collection='documentTypeIDs' item='id' open='(' separator=',' close=')'>#{id}</foreach> " +
+                "AND deleteFlag = 0" +
+                "</script>")
+        List<Map<String, Object>> findFileIDsByMatchIDAndDocumentTypeIDs(@Param("matchID") String matchID,
+                                                                         @Param("documentTypeIDs") List<Integer> documentTypeIDs);
+
+
 
         // 根据 matchID 查询文件ID集合
         @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND deleteFlag = 0")

@@ -29,6 +29,7 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/fms/ftp")
@@ -617,4 +618,26 @@ public class FtpController {
         }
     }
 
+    /**
+     * 批量查询接口
+     *
+     * @param matchID         匹配ID（必填）
+     * @param documentTypeIDs 文档类型ID集合（必填，可以传入多个，例如：documentTypeIDs=1,2,3）
+     * @return 返回结果示例: [{ "documentTypeID": 2, "fileID": "12212" }, { "documentTypeID": 3, "fileID": "12213" }]
+     */
+    @Anonymous
+    @GetMapping("/batchGetFileIDs")
+    public AjaxResult batchGetFileIDs(@RequestParam("matchID") String matchID,
+                                      @RequestParam("documentTypeIDs") List<Integer> documentTypeIDs) {
+        try {
+            // 参数校验：至少提供 matchID 和非空的 documentTypeIDs 集合
+            if (matchID == null || matchID.trim().isEmpty() || documentTypeIDs == null || documentTypeIDs.isEmpty()) {
+                return AjaxResult.error("必须提供 matchID 和至少一个 documentTypeID");
+            }
+            List<Map<String, Object>> result = fileService.getFileIDsByMatchIDAndDocumentTypeIDs(matchID, documentTypeIDs);
+            return AjaxResult.success(result);
+        } catch (Exception e) {
+            return AjaxResult.error("批量查询文件ID失败", e.getMessage());
+        }
+    }
 }
