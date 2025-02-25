@@ -9,6 +9,23 @@ import java.util.Map;
 @Mapper
 public interface CYFileMapper {
 
+        // 根据 matchID、documentTypeIDs 和 PlanTrackingNumber 查询文件ID集合
+        @Select("<script>" +
+                "SELECT fileID, documentTypeID " +
+                "FROM cy_file " +
+                "WHERE matchID = #{matchID} " +
+                "AND planTrackingNumber = #{planTrackingNumber} " +
+                "AND documentTypeID IN " +
+                "<foreach collection='documentTypeIDs' item='item' separator=',' open='(' close=')'>" +
+                "#{item}" +
+                "</foreach> " +
+                "AND deleteFlag = 0" +
+                "</script>")
+        List<Map<String, Object>> findFileIDsByMatchIDAndDocumentTypeIDsAndPlanTrackingNumber(
+                @Param("matchID") String matchID,
+                @Param("documentTypeIDs") List<Integer> documentTypeIDs,
+                @Param("planTrackingNumber") String planTrackingNumber);
+
         // 根据 matchID 和 documentTypeID 和 PlanTrackingNumber 查询文件ID集合
         @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND documentTypeID = #{documentTypeID} AND planTrackingNumber = #{planTrackingNumber} AND deleteFlag = 0")
         List<String> findFileIDsByMatchIDAndDocumentTypeIDAndPlanTrackingNumber(@Param("matchID") String matchID,

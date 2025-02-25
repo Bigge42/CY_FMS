@@ -222,5 +222,18 @@ public class FileService {
     public List<String> getFileIDsByMatchIDAndPlanTrackingNumber(String matchID, String planTrackingNumber) {
         return fileMapper.findFileIDsByMatchIDAndPlanTrackingNumber(matchID, planTrackingNumber);
     }
+    /**
+     * 根据 matchID、documentTypeIDs 和 PlanTrackingNumber 查询文件ID集合
+     *
+     * @param matchID            匹配ID
+     * @param documentTypeIDs     文档类型ID集合
+     * @param planTrackingNumber 计划跟踪编号
+     * @return List<Map<String, Object>> 每个Map包含 documentTypeID 和 fileID
+     */
+    public List<Map<String, Object>> getFileIDsByMatchIDAndDocumentTypeIDsAndPlanTrackingNumber(String matchID,
+                                                                                                List<Integer> documentTypeIDs,
+                                                                                                String planTrackingNumber) {
+        return fileMapper.findFileIDsByMatchIDAndDocumentTypeIDsAndPlanTrackingNumber(matchID, documentTypeIDs, planTrackingNumber);
+    }
 
 }

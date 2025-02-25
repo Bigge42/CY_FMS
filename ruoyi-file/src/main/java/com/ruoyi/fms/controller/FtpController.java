@@ -659,21 +659,39 @@ public class FtpController {
      *
      * @param matchID         匹配ID（必填）
      * @param documentTypeIDs 文档类型ID集合（必填，可以传入多个，例如：documentTypeIDs=1,2,3）
+     * @param planTrackingNumber 可选的计划跟踪编号（如果提供，必须提供 matchID）
      * @return 返回结果示例: [{ "documentTypeID": 2, "fileID": "12212" }, { "documentTypeID": 3, "fileID": "12213" }]
      */
     @Anonymous
     @GetMapping("/batchGetFileIDs")
     public AjaxResult batchGetFileIDs(@RequestParam("matchID") String matchID,
-                                      @RequestParam("documentTypeIDs") List<Integer> documentTypeIDs) {
+                                      @RequestParam("documentTypeIDs") List<Integer> documentTypeIDs,
+                                      @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
         try {
+            // 如果传入 PlanTrackingNumber，则必须同时提供 matchID
+            if (planTrackingNumber != null && (matchID == null || matchID.trim().isEmpty())) {
+                return AjaxResult.error("当提供 PlanTrackingNumber 参数时，必须同时提供 matchID 参数");
+            }
+
             // 参数校验：至少提供 matchID 和非空的 documentTypeIDs 集合
             if (matchID == null || matchID.trim().isEmpty() || documentTypeIDs == null || documentTypeIDs.isEmpty()) {
                 return AjaxResult.error("必须提供 matchID 和至少一个 documentTypeID");
             }
-            List<Map<String, Object>> result = fileService.getFileIDsByMatchIDAndDocumentTypeIDs(matchID, documentTypeIDs);
+
+            // 查询文件ID集合
+            List<Map<String, Object>> result;
+            if (planTrackingNumber != null) {
+                // 同时提供 matchID 和 PlanTrackingNumber
+                result = fileService.getFileIDsByMatchIDAndDocumentTypeIDsAndPlanTrackingNumber(matchID, documentTypeIDs, planTrackingNumber);
+            } else {
+                // 仅提供 matchID 和 documentTypeIDs
+                result = fileService.getFileIDsByMatchIDAndDocumentTypeIDs(matchID, documentTypeIDs);
+            }
+
             return AjaxResult.success(result);
         } catch (Exception e) {
             return AjaxResult.error("批量查询文件ID失败", e.getMessage());
         }
     }
+
 }
