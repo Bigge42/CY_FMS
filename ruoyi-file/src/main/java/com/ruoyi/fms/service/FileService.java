@@ -88,6 +88,8 @@ public class FileService {
                 return "SPR"; // Spraying Report
             case 12:
                 return "SWR"; // Spray Welding Report
+            case 13:
+                return "MM"; //Marking
             default:
                 return "UNK"; // Unknown
         }

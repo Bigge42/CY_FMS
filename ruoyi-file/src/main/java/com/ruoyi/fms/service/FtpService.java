@@ -30,7 +30,7 @@ public class FtpService {
 
 
     /**
-     * 递归创建远程目录（逐级切换 & 创建）。
+     * 递归创建远程目录（逐级切换 & 创建）
      *
      * @param ftpClient     FTPClient 实例
      * @param remoteDirPath 远程目录路径（相对于 ftp.remoteDir），例如 "uploads/abc/def"

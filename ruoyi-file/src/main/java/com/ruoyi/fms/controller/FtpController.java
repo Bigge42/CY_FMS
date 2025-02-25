@@ -61,7 +61,8 @@ public class FtpController {
             "Part Dimension Record Report",        // 零件尺寸记录报告
             "Heat Treatment Report",               // 热处理报告
             "Spraying Report",                     // 喷涂报告
-            "Spray Welding Report"                 // 喷焊报告
+            "Spray Welding Report",                 // 喷焊报告
+            "Marking"                               // 唛头
     );
 
     /**
@@ -99,6 +100,8 @@ public class FtpController {
                 return "Spraying Report";                    // 喷涂报告
             case 12:
                 return "Spray Welding Report";               // 喷焊报告
+            case 13:
+                return "Marking";                            // 唛头
             default:
                 return null;
         }
