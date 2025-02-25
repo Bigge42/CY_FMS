@@ -9,6 +9,18 @@ import java.util.Map;
 @Mapper
 public interface CYFileMapper {
 
+        // 根据 matchID 和 documentTypeID 和 PlanTrackingNumber 查询文件ID集合
+        @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND documentTypeID = #{documentTypeID} AND planTrackingNumber = #{planTrackingNumber} AND deleteFlag = 0")
+        List<String> findFileIDsByMatchIDAndDocumentTypeIDAndPlanTrackingNumber(@Param("matchID") String matchID,
+                                                                                @Param("documentTypeID") Integer documentTypeID,
+                                                                                @Param("planTrackingNumber") String planTrackingNumber);
+
+        // 根据 matchID 和 PlanTrackingNumber 查询文件ID集合
+        @Select("SELECT fileID FROM cy_file WHERE matchID = #{matchID} AND planTrackingNumber = #{planTrackingNumber} AND deleteFlag = 0")
+        List<String> findFileIDsByMatchIDAndPlanTrackingNumber(@Param("matchID") String matchID,
+                                                               @Param("planTrackingNumber") String planTrackingNumber);
+
+
         // 根据 matchID 和多个 documentTypeID 查询文件ID集合
         @Select("<script>" +
                 "SELECT documentTypeID, fileID " +

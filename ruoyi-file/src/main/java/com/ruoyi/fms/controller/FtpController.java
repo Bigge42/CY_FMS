@@ -28,10 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/fms/ftp")
@@ -608,25 +605,43 @@ public class FtpController {
     @Anonymous
     @GetMapping("/getFileIDs")
     public AjaxResult getFileIDs(@RequestParam(value = "matchID", required = false) String matchID,
-                                 @RequestParam(value = "documentTypeID", required = false) Integer documentTypeID) {
+                                 @RequestParam(value = "documentTypeID", required = false) Integer documentTypeID,
+                                 @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber) {
         try {
-            // 参数校验，至少提供一个参数
-            if (matchID == null && documentTypeID == null) {
-                return AjaxResult.error("至少提供 matchID 或 documentTypeID 参数");
+            // 如果传入 PlanTrackingNumber，则必须同时提供 matchID
+            if (planTrackingNumber != null && matchID == null) {
+                return AjaxResult.error("当提供 PlanTrackingNumber 参数时，必须同时提供 matchID 参数");
+            }
+
+            // 至少需要提供一个参数
+            if (matchID == null && documentTypeID == null && planTrackingNumber == null) {
+                return AjaxResult.error("至少提供 matchID、documentTypeID 或 PlanTrackingNumber 参数");
             }
 
             List<String> fileIDs;
 
-            // 根据不同的参数组合来查询文件ID
-            if (matchID != null && documentTypeID != null) {
+            // 根据参数组合调用对应的查询方法
+            if (matchID != null && documentTypeID != null && planTrackingNumber != null) {
+                // 同时提供 matchID、documentTypeID 和 PlanTrackingNumber
+                fileIDs = fileService.getFileIDsByMatchIDAndDocumentTypeIDAndPlanTrackingNumber(matchID, documentTypeID, planTrackingNumber);
+            } else if (matchID != null && documentTypeID != null) {
                 // 同时提供 matchID 和 documentTypeID
                 fileIDs = fileService.getFileIDsByMatchIDAndDocumentTypeID(matchID, documentTypeID);
+            } else if (matchID != null && planTrackingNumber != null) {
+                // 同时提供 matchID 和 PlanTrackingNumber
+                fileIDs = fileService.getFileIDsByMatchIDAndPlanTrackingNumber(matchID, planTrackingNumber);
+            } else if (documentTypeID != null && planTrackingNumber != null) {
+                // 此组合无效：PlanTrackingNumber 必须与 matchID 一起使用
+                return AjaxResult.error("PlanTrackingNumber 参数必须与 matchID 参数一起提供");
             } else if (matchID != null) {
-                // 只提供 matchID
+                // 仅提供 matchID
                 fileIDs = fileService.getFileIDsByMatchID(matchID);
-            } else {
-                // 只提供 documentTypeID
+            } else if (documentTypeID != null) {
+                // 仅提供 documentTypeID
                 fileIDs = fileService.getFileIDsByDocumentTypeID(documentTypeID);
+            } else {
+                // 不会执行到这里，因为所有情况都已处理
+                return AjaxResult.error("参数不合法");
             }
 
             return AjaxResult.success(fileIDs);
@@ -634,6 +649,10 @@ public class FtpController {
             return AjaxResult.error("查询文件ID失败", e.getMessage());
         }
     }
+
+
+
+
 
     /**
      * 批量查询接口

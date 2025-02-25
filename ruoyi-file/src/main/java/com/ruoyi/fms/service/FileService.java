@@ -199,4 +199,28 @@ public class FileService {
     public List<Map<String, Object>> getFileIDsByMatchIDAndDocumentTypeIDs(String matchID, List<Integer> documentTypeIDs) {
         return fileMapper.findFileIDsByMatchIDAndDocumentTypeIDs(matchID, documentTypeIDs);
     }
+
+    /**
+     * 根据 matchID、documentTypeID 和 PlanTrackingNumber 查询文件ID集合
+     *
+     * @param matchID            匹配ID
+     * @param documentTypeID     文档类型ID
+     * @param planTrackingNumber 计划跟踪编号
+     * @return List<String> 文件ID集合
+     */
+    public List<String> getFileIDsByMatchIDAndDocumentTypeIDAndPlanTrackingNumber(String matchID, Integer documentTypeID, String planTrackingNumber) {
+        return fileMapper.findFileIDsByMatchIDAndDocumentTypeIDAndPlanTrackingNumber(matchID, documentTypeID, planTrackingNumber);
+    }
+
+    /**
+     * 根据 matchID 和 PlanTrackingNumber 查询文件ID集合
+     *
+     * @param matchID            匹配ID
+     * @param planTrackingNumber 计划跟踪编号
+     * @return List<String> 文件ID集合
+     */
+    public List<String> getFileIDsByMatchIDAndPlanTrackingNumber(String matchID, String planTrackingNumber) {
+        return fileMapper.findFileIDsByMatchIDAndPlanTrackingNumber(matchID, planTrackingNumber);
+    }
+
 }
