@@ -58,9 +58,14 @@ public class FtpController {
             "Part Dimension Record Report",        // 零件尺寸记录报告
             "Heat Treatment Report",               // 热处理报告
             "Spraying Report",                     // 喷涂报告
-            "Spray Welding Report",                 // 喷焊报告
-            "Marking"                               // 唛头
+            "Spray Welding Report",                // 喷焊报告
+            "Marking",                             // 唛头
+            "Pneumatic Circuit Diagram",           // 气路图
+            "Exterior Dimension Drawing",          // 外形尺寸图
+            "Calculation Report",                  // 计算书
+            "Supplier Raw Material Attachment"     // 供应商原材料附件
     );
+
 
     /**
      * 根据 DocumentTypeID 获取对应的文档类型名称（英文名称）
@@ -99,6 +104,14 @@ public class FtpController {
                 return "Spray Welding Report";               // 喷焊报告
             case 13:
                 return "Marking";                            // 唛头
+            case 15:
+                return "Pneumatic Circuit Diagram"; //  气路图
+            case 16:
+                return "Exterior Dimension Drawing"; //  外形尺寸图
+            case 17:
+                return "Calculation Report"; //  计算书
+            case 18:
+                return "Supplier Raw Material Attachment"; //供应商原材料附件
             default:
                 return null;
         }
@@ -540,10 +553,6 @@ public class FtpController {
         }
     }
 
-
-
-
-
     /**
      * 将原始文件转换为 PDF 文件
      * <p>
@@ -602,6 +611,14 @@ public class FtpController {
         }
     }
 
+    /**
+     * 批量文件ID接口
+     *
+     * @param matchID         匹配ID（必填）
+     * @param documentTypeID 文档类型ID（必填）
+     * @param planTrackingNumber 可选的计划跟踪编号（如果提供，必须提供 matchID）
+     * @return fileIDs
+     */
     @Anonymous
     @GetMapping("/getFileIDs")
     public AjaxResult getFileIDs(@RequestParam(value = "matchID", required = false) String matchID,
@@ -649,10 +666,6 @@ public class FtpController {
             return AjaxResult.error("查询文件ID失败", e.getMessage());
         }
     }
-
-
-
-
 
     /**
      * 批量查询接口

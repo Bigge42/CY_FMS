@@ -53,12 +53,6 @@ public class FileService {
         return fileMapper.markAsDeleted(fileID);
     }
 
-    /**
-     * 根据 DocumentTypeID 获取对应的文档类型缩写
-     *
-     * @param documentTypeID 文档类型ID
-     * @return 文档类型缩写，如果不存在则返回 "UNK"
-     */
     public String getDocumentTypeAbbreviation(Integer documentTypeID) {
         if (documentTypeID == null) {
             return "UNK"; // Unknown
@@ -89,11 +83,20 @@ public class FileService {
             case 12:
                 return "SWR"; // Spray Welding Report
             case 13:
-                return "MM"; //Marking
+                return "MM";  // Marking
+            case 15:
+                return "PCD"; // Pneumatic Circuit Diagram (气路图)
+            case 16:
+                return "EDD"; // Exterior Dimension Drawing (外形尺寸图)
+            case 17:
+                return "CAL"; // Calculation Report (计算书)
+            case 18:
+                return "SRA"; //Supplier Raw Material Attachment
             default:
                 return "UNK"; // Unknown
         }
     }
+
 
     /**
      * 根据文档类型ID生成文件ID（缩写 + 时间戳）
