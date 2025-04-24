@@ -87,6 +87,8 @@ public class FileService {
                 return "EDD"; // Exterior Dimension Drawing (外形尺寸图)
             case 17:
                 return "CAL"; // Calculation Report (计算书)
+            case 18:
+                return "SRA"; //Supplier Raw Material Attachment
             default:
                 return "UNK"; // Unknown
         }
