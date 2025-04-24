@@ -9,10 +9,7 @@ import org.springframework.stereotype.Service;
 
 
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class FileService {
@@ -90,8 +87,6 @@ public class FileService {
                 return "EDD"; // Exterior Dimension Drawing (外形尺寸图)
             case 17:
                 return "CAL"; // Calculation Report (计算书)
-            case 18:
-                return "SRA"; //Supplier Raw Material Attachment
             default:
                 return "UNK"; // Unknown
         }
@@ -237,6 +232,16 @@ public class FileService {
                                                                                                 List<Integer> documentTypeIDs,
                                                                                                 String planTrackingNumber) {
         return fileMapper.findFileIDsByMatchIDAndDocumentTypeIDsAndPlanTrackingNumber(matchID, documentTypeIDs, planTrackingNumber);
+    }
+
+    /**
+     * 根据 fileId 列表，批量返回它们的 fileURL
+     */
+    public List<String> getFilePathsByFileIds(List<String> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return fileMapper.selectFileURLsByIds(fileIds);
     }
 
 }

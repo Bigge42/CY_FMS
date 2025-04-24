@@ -9,6 +9,7 @@ import java.util.Map;
 @Mapper
 public interface CYFileMapper {
 
+
         // 根据 matchID、documentTypeIDs 和 PlanTrackingNumber 查询文件ID集合
         @Select("<script>" +
                 "SELECT fileID, documentTypeID " +
@@ -76,17 +77,33 @@ public interface CYFileMapper {
                        @Param("fileURL") String fileURL,
                        @Param("deleteFlag") boolean deleteFlag);
 
-        @Insert("INSERT INTO CY_FILE(fileID,fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
+        @Insert("INSERT INTO cy_file(fileID,fileName, folderID, documentTypeID, matchID, documentTypeName, versionNumber, planTrackingNumber, createdBy, createdAt, fileURL) " +
                 "VALUES(#{fileID},#{fileName}, #{folderID}, #{documentTypeID}, #{matchID}, #{documentTypeName}, #{versionNumber}, #{planTrackingNumber}, #{createdBy}, NOW(), #{fileURL})")
         @Options(useGeneratedKeys = true, keyProperty = "fileID")
         int insertFile(CYFile file);
 
-        @Select("SELECT * FROM CY_FILE WHERE documentTypeName = #{documentTypeName} AND matchID = #{matchID} AND deleteFlag = 0")
+        @Select("SELECT * FROM cy_file WHERE documentTypeName = #{documentTypeName} AND matchID = #{matchID} AND deleteFlag = 0")
         CYFile findByFileNameAndMatchID(@Param("documentTypeName") String documentTypeName, @Param("matchID") Integer matchID);
 
         @Update("UPDATE CY_FILE SET deleteFlag = 1, updatedAt = NOW() WHERE fileID = #{fileID}")
         int markAsDeleted(@Param("fileID") String fileID);
 
-        @Select("SELECT * FROM CY_FILE WHERE fileID = #{fileId} AND deleteFlag = 0")
+        @Select("SELECT * FROM cy_file WHERE fileID = #{fileId} AND deleteFlag = 0")
         CYFile selectByFileId(@Param("fileId") String fileId);
+
+        /**
+         * 批量查询：根据 fileId 列表返回对应的 fileURL
+         * 注意这里列名和实体属性都是驼峰：
+         *   表列：fileID, fileURL, deleteFlag
+         */
+        @Select("<script>\n"
+                + "SELECT fileURL\n"
+                + "  FROM cy_file\n"
+                + " WHERE fileID IN\n"
+                + "   <foreach collection='fileIds' item='id' open='(' separator=',' close=')'>\n"
+                + "     #{id}\n"
+                + "   </foreach>\n"
+                + "   AND deleteFlag = 0\n"
+                + "</script>")
+        List<String> selectFileURLsByIds(@Param("fileIds") List<String> fileIds);
 }

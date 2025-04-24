@@ -1,6 +1,8 @@
 package com.ruoyi.fms.service;
 
 import com.ruoyi.fms.config.FtpConfig;
+import com.ruoyi.fms.mapper.CYFileMapper;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.net.ftp.FTP;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPReply;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLEncoder;
@@ -17,12 +20,22 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import org.apache.commons.net.ftp.FTPClient;
+import java.io.InputStream;
+import java.io.IOException;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
 /**
  * FtpService 负责处理与 FTP 服务器的连接、上传、下载和删除文件操作。
  */
 @Service
 public class FtpService {
-
+    @Resource
+    private FileService fileService;       // 查询 fileURL 的 Service
+    @Resource
+    private CYFileMapper fileMapper;       // 如果你直接用 mapper
     private static final Logger log = LoggerFactory.getLogger(FtpService.class);
 
     @Autowired
@@ -238,7 +251,6 @@ public class FtpService {
     }
 
 
-
     /**
      * 删除文件从 FTP 服务器。
      *
@@ -273,6 +285,46 @@ public class FtpService {
             return success;
 
         } finally {
+            disconnect(ftpClient);
+        }
+    }
+    /**
+     * 打开 FTP 上某个文件的输入流，用于流式读取。
+     *
+     * @param remoteFolder 远程目录（相对于 ftpConfig.getRemoteDir()）
+     * @param fileName     远程文件名
+     * @return 对应文件的 InputStream
+     * @throws IOException 登录、切目录或拉流失败时抛出
+     */
+    public InputStream retrieveFileStream(String remoteFolder, String fileName) throws IOException {
+        FTPClient ftpClient = new FTPClient();
+        // 1. 连接并登录
+        connectAndLogin(ftpClient);
+        // 2. 二进制模式、被动模式、UTF-8
+        ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+        ftpClient.enterLocalPassiveMode();
+        enableUTF8Encoding(ftpClient);
+        // 3. 切换到目录
+        if (!ftpClient.changeWorkingDirectory(remoteFolder)) {
+            throw new IOException("切换目录失败: " + remoteFolder + "，replyCode=" + ftpClient.getReplyCode());
+        }
+        // 4. 打开流
+        return ftpClient.retrieveFileStream(fileName);
+    }
+
+
+    /**
+     * 结束上一次 retrieveFileStream 操作，并断开连接。
+     *
+     * @param ftpClient 上一个方法内部 new 出来的 FTPClient
+     * @return 完成命令是否成功
+     * @throws IOException I/O 异常
+     */
+    public boolean completePendingCommand(FTPClient ftpClient) throws IOException {
+        try {
+            return ftpClient.completePendingCommand();
+        } finally {
+            // 退出并断开
             disconnect(ftpClient);
         }
     }
@@ -394,4 +446,48 @@ public class FtpService {
     public String getTempDir() {
         return ftpConfig.getTempDir();
     }
+
+
+    public void writeFilesToZip(List<String> fileIds, OutputStream out) throws IOException {
+        // 0. 拿到所有 fileURL
+        List<String> paths = fileService.getFilePathsByFileIds(fileIds);
+
+        try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
+            for (String filePath : paths) {
+                if (filePath == null) continue;
+
+                // 拆目录和文件名
+                int idx = filePath.lastIndexOf('/');
+                String remoteFolder = filePath.substring(0, idx);
+                String fileName     = filePath.substring(idx + 1);
+
+                // 1) 打开 FTP 连接并登录
+                FTPClient ftp = new FTPClient();
+                connectAndLogin(ftp);
+                ftp.setFileType(FTPClient.BINARY_FILE_TYPE);
+                ftp.enterLocalPassiveMode();
+                enableUTF8Encoding(ftp);
+
+                // 2) 切目录
+                if (!ftp.changeWorkingDirectory(remoteFolder)) {
+                    disconnect(ftp);
+                    continue;
+                }
+
+                // 3) 拉流、写 ZIP entry
+                try (InputStream is = ftp.retrieveFileStream(fileName)) {
+                    zipOut.putNextEntry(new ZipEntry(fileName));
+                    IOUtils.copy(is, zipOut);
+                    zipOut.closeEntry();
+                }
+
+                // 4) 完成命令并断开
+                ftp.completePendingCommand();
+                disconnect(ftp);
+            }
+            zipOut.finish();
+        }
+    }
+
+
 }

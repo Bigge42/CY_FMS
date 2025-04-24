@@ -8,6 +8,7 @@ import com.ruoyi.fms.service.FileService;
 import com.ruoyi.fms.service.FolderService;
 import com.ruoyi.fms.service.FtpService;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.net.ftp.FTPClient;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -29,6 +30,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
+
+import java.util.zip.ZipOutputStream;
+import java.util.zip.ZipEntry;
+import org.apache.commons.io.IOUtils;
 
 @RestController
 @RequestMapping("/fms/ftp")
@@ -62,10 +67,10 @@ public class FtpController {
             "Marking",                             // 唛头
             "Pneumatic Circuit Diagram",           // 气路图
             "Exterior Dimension Drawing",          // 外形尺寸图
-            "Calculation Report",                  // 计算书
+            "Calculation Report",               // 计算书
             "Supplier Raw Material Attachment"     // 供应商原材料附件
-    );
 
+    );
 
     /**
      * 根据 DocumentTypeID 获取对应的文档类型名称（英文名称）
@@ -111,7 +116,7 @@ public class FtpController {
             case 17:
                 return "Calculation Report"; //  计算书
             case 18:
-                return "Supplier Raw Material Attachment"; //供应商原材料附件
+                return "Supplier Raw Material Attachment";// 供应商原材料附件
             default:
                 return null;
         }
@@ -610,6 +615,24 @@ public class FtpController {
             return false;
         }
     }
+
+    /**
+     * 批量 ZIP 下载
+     * GET /fms/ftp/downloadZip?fileIds=ID1&fileIds=ID2...
+     */
+    @Anonymous
+    @GetMapping("/downloadZip")
+    public void downloadZip(@RequestParam("fileIds") List<String> fileIds,
+                            HttpServletResponse response) throws IOException {
+        // 1) 设置响应头
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename=\"files.zip\"");
+
+        // 2) 交给 Service 去拉流、打 ZIP
+        ftpService.writeFilesToZip(fileIds, response.getOutputStream());
+    }
+
+
 
     /**
      * 批量文件ID接口
