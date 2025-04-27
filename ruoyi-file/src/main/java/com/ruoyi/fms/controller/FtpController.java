@@ -209,52 +209,18 @@ public class FtpController {
 
 
 
+    /**
+     * TCdownload 接口：传入物料编码，自动判断下载路径并拉取对应 PDF
+     * 示例：
+     *   GET /ftp/TCdownload?code=ABC.123    → /SMT/smtpdf/ABC.123.pdf
+     *   GET /ftp/TCdownload?code=XYZ        → /TZ/TZ/XYZ&C/XYZ&C.pdf  （C 为最大后缀字母）
+     */
     @Anonymous
-    @GetMapping("/getSmtFile")
-    public void getSmtFile(@RequestParam("smtfile") String smtfile, HttpServletResponse response) {
-        try {
-            // 如果传入的 smtfile 不以 ".pdf"（不区分大小写）结尾，则追加 .pdf
-            if (!smtfile.toLowerCase().endsWith(".pdf")) {
-                // 如果文件名末尾是一个点，则去掉该点
-                if (smtfile.endsWith(".")) {
-                    smtfile = smtfile.substring(0, smtfile.length() - 1);
-                }
-                smtfile = smtfile + ".pdf";
-            }
-
-            // 固定 FTP 服务器的远程目录为 "/smtpdf"
-            String remoteFolder = "/smtpdf";
-            // 拼接本地临时文件路径，假设 ftpService.getTempDir() 返回类似 "/tmp/" 的路径
-            String localFilePath = ftpService.getTempDir() + smtfile;
-
-            // 调用服务层下载文件
-            boolean success = ftpService.downloadFile(remoteFolder, smtfile, localFilePath);
-            if (!success) {
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                response.getWriter().write("文件下载失败或不存在");
-                return;
-            }
-
-            // 设置响应头，采用附件方式返回文件流
-            response.setContentType("application/pdf");
-            response.setHeader("Content-Disposition", "attachment; filename=\"" + smtfile + "\"");
-
-            // 将本地临时文件的内容写入 HTTP 响应
-            try (InputStream is = new FileInputStream(localFilePath);
-                 OutputStream os = response.getOutputStream()) {
-                StreamUtils.copy(is, os);
-            }
-
-            // 下载完成后删除本地临时文件
-            Files.deleteIfExists(Paths.get(localFilePath));
-        } catch (Exception e) {
-            try {
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                response.getWriter().write("下载出现异常: " + e.getMessage());
-            } catch (IOException ex) {
-                // 忽略写入异常信息时的错误
-            }
-        }
+    @GetMapping("/TCdownload")
+    public void TCdownload(
+            @RequestParam("code") String code,
+            HttpServletResponse response) {
+        ftpService.downloadByMaterialCode(code, response);
     }
 
 
@@ -547,7 +513,7 @@ public class FtpController {
                     log.info("临时文件删除{}", deleted ? "成功" : "失败");
                 }
 
-                return Response.success("文件上传成功并已存储到数据库", cyFile.getFileID());
+                return Response.success("文件上传成功并已存  储到数据库", cyFile.getFileID());
             } catch (Exception e) {
                 log.error("文件上传或处理失败: {}", e.getMessage(), e);
                 return Response.error("文件上传或处理失败: " + e.getMessage());

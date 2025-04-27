@@ -3,9 +3,7 @@ package com.ruoyi.fms.service;
 import com.ruoyi.fms.config.FtpConfig;
 import com.ruoyi.fms.mapper.CYFileMapper;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.net.ftp.FTP;
-import org.apache.commons.net.ftp.FTPClient;
-import org.apache.commons.net.ftp.FTPReply;
+import org.apache.commons.net.ftp.*;
 import org.slf4j.Logger;    
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +13,7 @@ import org.springframework.util.StreamUtils;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,6 +22,8 @@ import java.nio.file.Paths;
 import org.apache.commons.net.ftp.FTPClient;
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -489,5 +490,103 @@ public class FtpService {
         }
     }
 
+
+
+
+    /**
+     * 根据物料编码自动选择目录并下载 PDF：
+     * - code 含 “.” → /SMT/smtpdf/{code}.pdf
+     * - 否则 → /TZ/TZ/{code&X}/{code&X}.pdf  （X 为最大后缀字母）
+     * 下载时文件名即为找到的 fileName（含中文及 & 符号）
+     */
+    public void downloadByMaterialCode(String code, HttpServletResponse response) {
+        FTPClient ftp = new FTPClient();
+        // 用 GBK 解码服务器返回的中文文件名
+        ftp.setControlEncoding("GBK");
+        FTPClientConfig cfg = new FTPClientConfig(FTPClientConfig.SYST_NT);
+        cfg.setServerLanguageCode("zh");
+        ftp.configure(cfg);
+
+        try {
+            // 1. 连接 & 登录
+            ftp.connect(ftpConfig.getHost(), ftpConfig.getPort());
+            if (!ftp.login(ftpConfig.getUsername(), ftpConfig.getPassword())) {
+                throw new RuntimeException("FTP 登录失败");
+            }
+            ftp.enterLocalPassiveMode();
+            ftp.setFileType(FTP.BINARY_FILE_TYPE);
+
+            // 2. 选目录 & 确定 fileName（原始中文名称）
+            String remoteDir, fileName;
+            if (code.contains(".")) {
+                remoteDir = "/SMT/smtpdf";
+                fileName  = code + ".pdf";
+            } else {
+                String baseDir = "/TZ/TZ";
+                if (!ftp.changeWorkingDirectory(baseDir)) {
+                    response.reset();
+                    throw new RuntimeException("切换基础目录失败：" + baseDir);
+                }
+                FTPFile[] dirs = ftp.listDirectories();
+                String prefix = code + "&";
+                String selected = Arrays.stream(dirs)
+                        .map(FTPFile::getName)
+                        .filter(n -> n.startsWith(prefix))
+                        .max(Comparator.comparing(n -> n.substring(prefix.length())))
+                        .orElseThrow(() -> {
+                            response.reset();
+                            return new RuntimeException("未找到 TZ 子目录：" + code);
+                        });
+                remoteDir = baseDir + "/" + selected;
+                fileName  = selected + ".pdf";
+            }
+
+            // 3. 切到目标目录 & 验证存在
+            if (!ftp.changeWorkingDirectory(remoteDir)) {
+                response.reset();
+                throw new RuntimeException("切换到目标目录失败：" + remoteDir);
+            }
+            boolean exists = Arrays.stream(ftp.listFiles())
+                    .map(FTPFile::getName)
+                    .anyMatch(n -> n.equals(fileName));
+            if (!exists) {
+                response.reset();
+                throw new RuntimeException("文件不存在：" + fileName);
+            }
+
+            // 4. 构造 Content-Disposition
+            //   filename* 百分号编码，现代浏览器优先使用
+            String pct = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20");
+            //   filename 回退：把 UTF-8 字节当 Latin-1 拼回去，保证全是 0–255
+            String fallback = new String(fileName.getBytes(StandardCharsets.UTF_8),
+                    StandardCharsets.ISO_8859_1);
+
+            String cd = String.format(
+                    "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+                    fallback, pct
+            );
+            response.reset();
+            response.setHeader("Content-Disposition", cd);
+            response.setCharacterEncoding("UTF-8");
+            response.setContentType("application/octet-stream");
+
+            // 5. 下载
+            try (OutputStream os = response.getOutputStream()) {
+                if (!ftp.retrieveFile(fileName, os)) {
+                    throw new RuntimeException("FTP retrieveFile 返回 false");
+                }
+                os.flush();
+            }
+
+        } catch (IOException e) {
+            response.reset();
+            throw new RuntimeException("FTP 下载异常: " + e.getMessage(), e);
+        } finally {
+            if (ftp.isConnected()) {
+                try { ftp.logout(); ftp.disconnect(); }
+                catch (IOException ignored) {}
+            }
+        }
+    }
 
 }
