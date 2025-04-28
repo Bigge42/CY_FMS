@@ -500,6 +500,9 @@ public class FtpService {
      * 下载时文件名即为找到的 fileName（含中文及 & 符号）
      */
     public void downloadByMaterialCode(String code, HttpServletResponse response) {
+        // 1️⃣ 将 code 中的 '/' 和 '*' 替换为合法文件名字符：'/' → '#'，'*' → '星'
+        String sanitizedCode = code.replace("/", "#").replace("*", "星");
+
         FTPClient ftp = new FTPClient();
         // 用 GBK 解码服务器返回的中文文件名
         ftp.setControlEncoding("GBK");
@@ -518,9 +521,9 @@ public class FtpService {
 
             // 2. 选目录 & 确定 fileName（原始中文名称）
             String remoteDir, fileName;
-            if (code.contains(".")) {
+            if (sanitizedCode.contains(".")) {
                 remoteDir = "/SMT/smtpdf";
-                fileName  = code + ".pdf";
+                fileName  = sanitizedCode + ".pdf";
             } else {
                 String baseDir = "/TZ/TZ";
                 if (!ftp.changeWorkingDirectory(baseDir)) {
@@ -528,7 +531,7 @@ public class FtpService {
                     throw new RuntimeException("切换基础目录失败：" + baseDir);
                 }
                 FTPFile[] dirs = ftp.listDirectories();
-                String prefix = code + "&";
+                String prefix = sanitizedCode + "&";
                 String selected = Arrays.stream(dirs)
                         .map(FTPFile::getName)
                         .filter(n -> n.startsWith(prefix))
