@@ -500,7 +500,7 @@ public class FtpService {
      * 下载时文件名即为找到的 fileName（含中文及 & 符号）
      */
     public void downloadByMaterialCode(String code, HttpServletResponse response) {
-        // 1️⃣ 将 code 中的 '/' 和 '*' 替换为合法文件名字符：'/' → '#'，'*' → '星'
+        //  将 code 中的 '/' 和 '*' 替换为合法文件名字符：'/' → '#'，'*' → '星'
         String sanitizedCode = code.replace("/", "#").replace("*", "星");
 
         FTPClient ftp = new FTPClient();
