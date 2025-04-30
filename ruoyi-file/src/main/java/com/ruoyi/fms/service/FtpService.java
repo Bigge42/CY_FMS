@@ -1,5 +1,6 @@
 package com.ruoyi.fms.service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ruoyi.fms.config.FtpConfig;
 import com.ruoyi.fms.mapper.CYFileMapper;
 import org.apache.commons.io.IOUtils;
@@ -20,11 +21,15 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import org.apache.commons.net.ftp.FTPClient;
+import org.springframework.web.util.UriComponentsBuilder;
+
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -490,28 +495,31 @@ public class FtpService {
         }
     }
 
-
-
+    /**
+     * 文件元数据：远程目录 + 文件名
+     */
+    public static class FileMeta {
+        public final String remoteDir;
+        public final String fileName;
+        public FileMeta(String remoteDir, String fileName) {
+            this.remoteDir = remoteDir;
+            this.fileName  = fileName;
+        }
+    }
 
     /**
-     * 根据物料编码自动选择目录并下载 PDF：
-     * - code 含 “.” → /SMT/smtpdf/{code}.pdf
-     * - 否则 → /TZ/TZ/{code&X}/{code&X}.pdf  （X 为最大后缀字母）
-     * 下载时文件名即为找到的 fileName（含中文及 & 符号）
+     * TCListFilesByCode：根据物料编码列出所有可下载文件
      */
-    public void downloadByMaterialCode(String code, HttpServletResponse response) {
-        //  将 code 中的 '/' 和 '*' 替换为合法文件名字符：'/' → '#'，'*' → '星'
-        String sanitizedCode = code.replace("/", "#").replace("*", "星");
-
+    public List<FileMeta> TCListFilesByCode(String code) {
+        String sanitized = code.replace("/", "#").replace("*", "星");
         FTPClient ftp = new FTPClient();
-        // 用 GBK 解码服务器返回的中文文件名
         ftp.setControlEncoding("GBK");
         FTPClientConfig cfg = new FTPClientConfig(FTPClientConfig.SYST_NT);
         cfg.setServerLanguageCode("zh");
         ftp.configure(cfg);
 
+        List<FileMeta> result = new ArrayList<>();
         try {
-            // 1. 连接 & 登录
             ftp.connect(ftpConfig.getHost(), ftpConfig.getPort());
             if (!ftp.login(ftpConfig.getUsername(), ftpConfig.getPassword())) {
                 throw new RuntimeException("FTP 登录失败");
@@ -519,51 +527,90 @@ public class FtpService {
             ftp.enterLocalPassiveMode();
             ftp.setFileType(FTP.BINARY_FILE_TYPE);
 
-            // 2. 选目录 & 确定 fileName（原始中文名称）
-            String remoteDir, fileName;
-            if (sanitizedCode.contains(".")) {
-                remoteDir = "/SMT/smtpdf";
-                fileName  = sanitizedCode + ".pdf";
-            } else {
-                String baseDir = "/TZ/TZ";
-                if (!ftp.changeWorkingDirectory(baseDir)) {
-                    response.reset();
-                    throw new RuntimeException("切换基础目录失败：" + baseDir);
+            if (sanitized.contains(".")) {
+                // SMT 路径
+                String dir = "/SMT/smtpdf";
+                String fn  = sanitized + ".pdf";
+                if (TCExistsOnFtp(ftp, dir, fn)) {
+                    result.add(new FileMeta(dir, fn));
                 }
-                FTPFile[] dirs = ftp.listDirectories();
-                String prefix = sanitizedCode + "&";
-                String selected = Arrays.stream(dirs)
+            } else {
+                // TZ 路径
+                String base = "/TZ/TZ";
+                if (!ftp.changeWorkingDirectory(base)) {
+                    throw new RuntimeException("切换基础目录失败：" + base);
+                }
+                String prefix = sanitized + "&";
+                List<String> dirs = Arrays.stream(ftp.listDirectories())
                         .map(FTPFile::getName)
                         .filter(n -> n.startsWith(prefix))
-                        .max(Comparator.comparing(n -> n.substring(prefix.length())))
-                        .orElseThrow(() -> {
-                            response.reset();
-                            return new RuntimeException("未找到 TZ 子目录：" + code);
-                        });
-                remoteDir = baseDir + "/" + selected;
-                fileName  = selected + ".pdf";
-            }
+                        .collect(Collectors.toList());
 
-            // 3. 切到目标目录 & 验证存在
-            if (!ftp.changeWorkingDirectory(remoteDir)) {
-                response.reset();
-                throw new RuntimeException("切换到目标目录失败：" + remoteDir);
+                String sel = dirs.stream()
+                        .max(Comparator.comparing(n -> n.substring(prefix.length())))
+                        .orElseThrow(() -> new RuntimeException("未找到 TZ 子目录：" + code));
+
+                String fullDir = base + "/" + sel;
+                if (!ftp.changeWorkingDirectory(fullDir)) {
+                    throw new RuntimeException("切换到目标目录失败：" + fullDir);
+                }
+                for (FTPFile f : ftp.listFiles()) {
+                    if (!f.isDirectory()) {
+                        result.add(new FileMeta(fullDir, f.getName()));
+                    }
+                }
             }
-            boolean exists = Arrays.stream(ftp.listFiles())
-                    .map(FTPFile::getName)
-                    .anyMatch(n -> n.equals(fileName));
-            if (!exists) {
+        } catch (IOException e) {
+            throw new RuntimeException("列文件失败: " + e.getMessage(), e);
+        } finally {
+            TCDisconnect(ftp);
+        }
+        return result;
+    }
+
+
+    public void TCDownload(String fullPath, HttpServletResponse response) {
+        // 分离目录和文件名
+        int idx = fullPath.lastIndexOf('/');
+        if (idx <= 0 || idx == fullPath.length() - 1) {
+            throw new IllegalArgumentException("无效的 path 参数: " + fullPath);
+        }
+        String remoteDir = fullPath.substring(0, idx);
+        String fileName  = fullPath.substring(idx + 1);
+        // 调用原有逻辑
+        TCDownload(remoteDir, fileName, response);
+    }
+
+    /**
+     * TCDownload：根据 remoteDir 和 fileName 拉取并返回文件
+     */
+    public void TCDownload(String remoteDir, String fileName, HttpServletResponse response) {
+        FTPClient ftp = new FTPClient();
+        ftp.setControlEncoding("GBK");
+        FTPClientConfig cfg = new FTPClientConfig(FTPClientConfig.SYST_NT);
+        cfg.setServerLanguageCode("zh");
+        ftp.configure(cfg);
+
+        try {
+            ftp.connect(ftpConfig.getHost(), ftpConfig.getPort());
+            if (!ftp.login(ftpConfig.getUsername(), ftpConfig.getPassword())) {
+                throw new RuntimeException("FTP 登录失败");
+            }
+            ftp.enterLocalPassiveMode();
+            ftp.setFileType(FTP.BINARY_FILE_TYPE);
+
+            if (!ftp.changeWorkingDirectory(remoteDir) ||
+                    Arrays.stream(ftp.listFiles()).noneMatch(f -> f.getName().equals(fileName))) {
                 response.reset();
                 throw new RuntimeException("文件不存在：" + fileName);
             }
 
-            // 4. 构造 Content-Disposition
-            //   filename* 百分号编码，现代浏览器优先使用
-            String pct = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20");
-            //   filename 回退：把 UTF-8 字节当 Latin-1 拼回去，保证全是 0–255
-            String fallback = new String(fileName.getBytes(StandardCharsets.UTF_8),
-                    StandardCharsets.ISO_8859_1);
-
+            // 构造下载头
+            String pct      = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20");
+            String fallback = new String(
+                    fileName.getBytes(StandardCharsets.UTF_8),
+                    StandardCharsets.ISO_8859_1
+            );
             String cd = String.format(
                     "attachment; filename=\"%s\"; filename*=UTF-8''%s",
                     fallback, pct
@@ -573,23 +620,108 @@ public class FtpService {
             response.setCharacterEncoding("UTF-8");
             response.setContentType("application/octet-stream");
 
-            // 5. 下载
+            // 拉取文件
             try (OutputStream os = response.getOutputStream()) {
                 if (!ftp.retrieveFile(fileName, os)) {
                     throw new RuntimeException("FTP retrieveFile 返回 false");
                 }
-                os.flush();
             }
-
         } catch (IOException e) {
             response.reset();
             throw new RuntimeException("FTP 下载异常: " + e.getMessage(), e);
         } finally {
-            if (ftp.isConnected()) {
-                try { ftp.logout(); ftp.disconnect(); }
-                catch (IOException ignored) {}
+            TCDisconnect(ftp);
+        }
+    }
+
+    /**
+     * TCExistsOnFtp：检查指定目录下是否存在指定文件
+     */
+    private boolean TCExistsOnFtp(FTPClient ftp, String dir, String fn) throws IOException {
+        if (!ftp.changeWorkingDirectory(dir)) return false;
+        return Arrays.stream(ftp.listFiles())
+                .map(FTPFile::getName)
+                .anyMatch(n -> n.equals(fn));
+    }
+
+    /**
+     * TCDisconnect：安全断开 FTP 连接
+     */
+    private void TCDisconnect(FTPClient ftp) {
+        if (ftp.isConnected()) {
+            try { ftp.logout(); ftp.disconnect(); }
+            catch (IOException ignored) {}
+        }
+    }
+
+    /**
+     * DTO：封装前端需要的返回结构
+     */
+
+    public static class FileUrlResponse {
+        private String materialCode;
+        private List<String> url = new ArrayList<>();
+
+        @JsonProperty("BGurl")
+        private List<String> bgurl = new ArrayList<>();
+
+        public FileUrlResponse(String materialCode) {
+            this.materialCode = materialCode;
+        }
+
+        public String getMaterialCode() {
+            return materialCode;
+        }
+        public void setMaterialCode(String materialCode) {
+            this.materialCode = materialCode;
+        }
+
+        public List<String> getUrl() {
+            return url;
+        }
+        public void setUrl(List<String> url) {
+            this.url = url;
+        }
+
+        // 这个 getter 名称不影响序列化名称，因为我们已经在字段上指定了 @JsonProperty
+        public List<String> getBgurl() {
+            return bgurl;
+        }
+        public void setBgurl(List<String> bgurl) {
+            this.bgurl = bgurl;
+        }
+    }
+
+
+    /**
+     * TCBuildFileUrls：根据物料编码和请求 baseUrl，返回 { materialCode, url, BGurl }
+     */
+    public FileUrlResponse TCBuildFileUrls(String code, String baseUrl) throws UnsupportedEncodingException {
+        // 1. 列出所有符合的远程文件
+        List<FileMeta> metas = TCListFilesByCode(code);
+        FileUrlResponse resp = new FileUrlResponse(code);
+
+        for (FileMeta meta : metas) {
+            // 原始全路径
+            String rawPath = meta.remoteDir + "/" + meta.fileName;
+            // 对整个 rawPath 做 URLEncoder
+            String encodedPath = URLEncoder.encode(rawPath, StandardCharsets.UTF_8.name());
+
+            // 构造下载 URL，带 path=encodedPath
+            String downloadUrl = UriComponentsBuilder
+                    .fromHttpUrl(baseUrl)
+                    .path("/fms/ftp/TCdownload")
+                    .queryParam("path", encodedPath)
+                    .build()
+                    .toUriString();
+
+            if (meta.fileName.contains("BG")) {
+                resp.getBgurl().add(downloadUrl);
+            } else {
+                resp.getUrl().add(downloadUrl);
             }
         }
+        return resp;
     }
 
 }

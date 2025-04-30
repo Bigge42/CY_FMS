@@ -21,6 +21,7 @@ import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLDecoder;
@@ -31,9 +32,11 @@ import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import java.util.stream.Collectors;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
 import org.apache.commons.io.IOUtils;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/fms/ftp")
@@ -210,19 +213,41 @@ public class FtpController {
 
 
     /**
-     * TCdownload 接口：传入物料编码，自动判断下载路径并拉取对应 PDF
+     * TCfiles 接口：传入物料编码，返回可下载文件的列表（code + urls）
      * 示例：
-     *   GET /ftp/TCdownload?code=ABC.123    → /SMT/smtpdf/ABC.123.pdf
-     *   GET /ftp/TCdownload?code=XYZ        → /TZ/TZ/XYZ&C/XYZ&C.pdf  （C 为最大后缀字母）
+     *   GET /ftp/TCfiles?code=ABC.123
+     */
+    @Anonymous
+    @GetMapping("/TCfiles")
+    public AjaxResult TCfiles(@RequestParam String code, HttpServletRequest request) throws UnsupportedEncodingException {
+        String base = ServletUriComponentsBuilder
+                .fromRequestUri(request)
+                .replacePath(null)
+                .build()
+                .toUriString();
+        FtpService.FileUrlResponse data = ftpService.TCBuildFileUrls(code, base);
+
+        return AjaxResult.success(data);
+    }
+
+
+
+    /**
+     * TCdownload 接口：接受已经 URL 编码过的 path 参数，
+     * 解码后交给 Service 层下载
      */
     @Anonymous
     @GetMapping("/TCdownload")
     public void TCdownload(
-            @RequestParam("code") String code,
-            HttpServletResponse response) {
-        ftpService.downloadByMaterialCode(code, response);
-    }
+            @RequestParam("path") String pathEncoded,
+            HttpServletResponse response) throws UnsupportedEncodingException {
 
+        // 1. 把 %XX 恢复成原始路径
+        String fullPath = URLDecoder.decode(pathEncoded, StandardCharsets.UTF_8.name());
+
+        // 2. 调用 Service 层（重载方法）进行目录分离 + 下载逻辑
+        ftpService.TCDownload(fullPath, response);
+    }
 
     /**
      * 公共方法：解析请求参数并调用 Service 层流文件输出方法
