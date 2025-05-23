@@ -25,10 +25,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.InputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -200,7 +198,8 @@ public class FtpService {
                 log.warn("删除临时文件失败: " + localFilePath, ex);
             }
         }
-    }   
+    }
+
     /**
      * 下载文件从 FTP 服务器。
      *
@@ -294,6 +293,7 @@ public class FtpService {
             disconnect(ftpClient);
         }
     }
+
     /**
      * 打开 FTP 上某个文件的输入流，用于流式读取。
      *
@@ -442,8 +442,6 @@ public class FtpService {
     }
 
 
-
-
     /**
      * 获取临时目录路径，用于在本地存储上传或下载的文件。
      *
@@ -465,7 +463,7 @@ public class FtpService {
                 // 拆目录和文件名
                 int idx = filePath.lastIndexOf('/');
                 String remoteFolder = filePath.substring(0, idx);
-                String fileName     = filePath.substring(idx + 1);
+                String fileName = filePath.substring(idx + 1);
 
                 // 1) 打开 FTP 连接并登录
                 FTPClient ftp = new FTPClient();
@@ -501,11 +499,15 @@ public class FtpService {
     public static class FileMeta {
         public final String remoteDir;
         public final String fileName;
-        public FileMeta(String remoteDir, String fileName) {
+        public final Date lastModified;  // 新增
+
+        public FileMeta(String remoteDir, String fileName, Date lastModified) {
             this.remoteDir = remoteDir;
-            this.fileName  = fileName;
+            this.fileName = fileName;
+            this.lastModified = lastModified;
         }
     }
+
 
     /**
      * TCListFilesByCode：根据物料编码列出所有可下载文件
@@ -530,9 +532,14 @@ public class FtpService {
             if (sanitized.contains(".")) {
                 // SMT 路径
                 String dir = "/SMT/smtpdf";
-                String fn  = sanitized + ".pdf";
-                if (TCExistsOnFtp(ftp, dir, fn)) {
-                    result.add(new FileMeta(dir, fn));
+                if (ftp.changeWorkingDirectory(dir)) {
+                    for (FTPFile f : ftp.listFiles()) {
+                        if (!f.isDirectory() && f.getName().equals(sanitized + ".pdf")) {
+                            Date lm = f.getTimestamp().getTime();
+                            result.add(new FileMeta(dir, f.getName(), lm));
+                            break;
+                        }
+                    }
                 }
             } else {
                 // TZ 路径
@@ -541,12 +548,10 @@ public class FtpService {
                     throw new RuntimeException("切换基础目录失败：" + base);
                 }
                 String prefix = sanitized + "&";
-                List<String> dirs = Arrays.stream(ftp.listDirectories())
+                // 找子目录
+                String sel = Arrays.stream(ftp.listDirectories())
                         .map(FTPFile::getName)
                         .filter(n -> n.startsWith(prefix))
-                        .collect(Collectors.toList());
-
-                String sel = dirs.stream()
                         .max(Comparator.comparing(n -> n.substring(prefix.length())))
                         .orElseThrow(() -> new RuntimeException("未找到 TZ 子目录：" + code));
 
@@ -556,7 +561,8 @@ public class FtpService {
                 }
                 for (FTPFile f : ftp.listFiles()) {
                     if (!f.isDirectory()) {
-                        result.add(new FileMeta(fullDir, f.getName()));
+                        Date lm = f.getTimestamp().getTime();
+                        result.add(new FileMeta(fullDir, f.getName(), lm));
                     }
                 }
             }
@@ -576,7 +582,7 @@ public class FtpService {
             throw new IllegalArgumentException("无效的 path 参数: " + fullPath);
         }
         String remoteDir = fullPath.substring(0, idx);
-        String fileName  = fullPath.substring(idx + 1);
+        String fileName = fullPath.substring(idx + 1);
         // 调用原有逻辑
         TCDownload(remoteDir, fileName, response);
     }
@@ -606,7 +612,7 @@ public class FtpService {
             }
 
             // 构造下载头
-            String pct      = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20");
+            String pct = URLEncoder.encode(fileName, "UTF-8").replace("+", "%20");
             String fallback = new String(
                     fileName.getBytes(StandardCharsets.UTF_8),
                     StandardCharsets.ISO_8859_1
@@ -649,79 +655,142 @@ public class FtpService {
      */
     private void TCDisconnect(FTPClient ftp) {
         if (ftp.isConnected()) {
-            try { ftp.logout(); ftp.disconnect(); }
-            catch (IOException ignored) {}
-        }
-    }
-
-    /**
-     * DTO：封装前端需要的返回结构
-     */
-
-    public static class FileUrlResponse {
-        private String materialCode;
-        private List<String> url = new ArrayList<>();
-
-        @JsonProperty("BGurl")
-        private List<String> bgurl = new ArrayList<>();
-
-        public FileUrlResponse(String materialCode) {
-            this.materialCode = materialCode;
-        }
-
-        public String getMaterialCode() {
-            return materialCode;
-        }
-        public void setMaterialCode(String materialCode) {
-            this.materialCode = materialCode;
-        }
-
-        public List<String> getUrl() {
-            return url;
-        }
-        public void setUrl(List<String> url) {
-            this.url = url;
-        }
-
-        // 这个 getter 名称不影响序列化名称，因为我们已经在字段上指定了 @JsonProperty
-        public List<String> getBgurl() {
-            return bgurl;
-        }
-        public void setBgurl(List<String> bgurl) {
-            this.bgurl = bgurl;
-        }
-    }
-
-
-    /**
-     * TCBuildFileUrls：根据物料编码和请求 baseUrl，返回 { materialCode, url, BGurl }
-     */
-    public FileUrlResponse TCBuildFileUrls(String code, String baseUrl) throws UnsupportedEncodingException {
-        // 1. 列出所有符合的远程文件
-        List<FileMeta> metas = TCListFilesByCode(code);
-        FileUrlResponse resp = new FileUrlResponse(code);
-
-        for (FileMeta meta : metas) {
-            // 原始全路径
-            String rawPath = meta.remoteDir + "/" + meta.fileName;
-            // 对整个 rawPath 做 URLEncoder
-            String encodedPath = URLEncoder.encode(rawPath, StandardCharsets.UTF_8.name());
-
-            // 构造下载 URL，带 path=encodedPath
-            String downloadUrl = UriComponentsBuilder
-                    .fromHttpUrl(baseUrl)
-                    .path("/fms/ftp/TCdownload")
-                    .queryParam("path", encodedPath)
-                    .build()
-                    .toUriString();
-
-            if (meta.fileName.contains("BG")) {
-                resp.getBgurl().add(downloadUrl);
-            } else {
-                resp.getUrl().add(downloadUrl);
+            try {
+                ftp.logout();
+                ftp.disconnect();
+            } catch (IOException ignored) {
             }
         }
-        return resp;
     }
 
+
+    /**
+     * FTP Service，负责构造文件下载 URL 并返回给前端
+     */
+
+
+        /**
+         * DTO：单条下载信息，包含 URL 和文件最后修改时间
+         */
+        public static class FileUrlInfo {
+            private String url;
+            private String lastModified;
+
+            public FileUrlInfo(String url, String lastModified) {
+                this.url = url;
+                this.lastModified = lastModified;
+            }
+
+            public String getUrl() {
+                return url;
+            }
+
+            public String getLastModified() {
+                return lastModified;
+            }
+
+            public void setUrl(String url) {
+                this.url = url;
+            }
+
+            public void setLastModified(String lm) {
+                this.lastModified = lm;
+            }
+        }
+
+        /**
+         * DTO：封装前端返回结构，只保留单个 url 和 BGurl 对象
+         */
+        public static class FileUrlResponse {
+            private String materialCode;
+            private FileUrlInfo url;            // 普通下载信息
+            @JsonProperty("BGurl")
+            private FileUrlInfo bgurl;          // 含 “BG” 文件的下载信息
+
+            public FileUrlResponse(String materialCode) {
+                this.materialCode = materialCode;
+            }
+
+            public String getMaterialCode() {
+                return materialCode;
+            }
+
+            public FileUrlInfo getUrl() {
+                return url;
+            }
+
+            public FileUrlInfo getBgurl() {
+                return bgurl;
+            }
+
+            public void setMaterialCode(String mc) {
+                this.materialCode = mc;
+            }
+
+            public void setUrl(FileUrlInfo u) {
+                this.url = u;
+            }
+
+            public void setBgurl(FileUrlInfo b) {
+                this.bgurl = b;
+            }
+        }
+
+        /**
+         * 根据物料编码和 baseUrl 构造下载列表
+         * 仅返回第一条普通文件和第一条 BG 文件的信息
+         */
+        public FileUrlResponse TCBuildFileUrls(String code, String baseUrl)
+                throws UnsupportedEncodingException {
+            // 1. 列出所有符合的远程文件，FileMeta 中已包含 lastModified
+            List<FileMeta> metas = TCListFilesByCode(code);
+
+            // 2. 构造返回 DTO，对应 materialCode
+            FileUrlResponse resp = new FileUrlResponse(code);
+
+            // 3. 时间格式化器："yyyy-MM-dd HH:mm:ss"
+            SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+            // 4. 遍历所有文件，按需取第一条 url 和 BGurl
+            for (FileMeta meta : metas) {
+                // 4.1 原始路径 + URL 编码
+                String rawPath = meta.remoteDir + "/" + meta.fileName;
+                String encodedPath = URLEncoder.encode(rawPath, StandardCharsets.UTF_8.name());
+
+                // 4.2 构造下载链接
+                String downloadUrl = UriComponentsBuilder
+                        .fromHttpUrl(baseUrl)
+                        .path("/fms/ftp/TCdownload")
+                        .queryParam("path", encodedPath)
+                        .build()
+                        .toUriString();
+
+                // 4.3 格式化最后修改时间
+                String lm = fmt.format(meta.lastModified);
+
+                // 4.4 封装单条下载信息
+                FileUrlInfo info = new FileUrlInfo(downloadUrl, lm);
+
+                // 4.5 根据文件名分流
+                if (meta.fileName.contains("BG")) {
+                    // 仅填充第一条 BGurl
+                    if (resp.getBgurl() == null) {
+                        resp.setBgurl(info);
+                    }
+                } else {
+                    // 仅填充第一条普通 url
+                    if (resp.getUrl() == null) {
+                        resp.setUrl(info);
+                    }
+                }
+
+                // 如果两者都已填，提前退出
+                if (resp.getUrl() != null && resp.getBgurl() != null) {
+                    break;
+                }
+            }
+
+            return resp;
+        }
 }
+
