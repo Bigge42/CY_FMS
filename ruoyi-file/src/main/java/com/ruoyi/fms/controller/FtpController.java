@@ -71,8 +71,8 @@ public class FtpController {
             "Pneumatic Circuit Diagram",           // 气路图
             "Exterior Dimension Drawing",          // 外形尺寸图
             "Calculation Report",               // 计算书
-            "Supplier Raw Material Attachment"     // 供应商原材料附件
-
+            "Supplier Raw Material Attachment",    // 供应商原材料附件
+            "OA"
     );
 
     /**
@@ -120,6 +120,8 @@ public class FtpController {
                 return "Calculation Report"; //  计算书
             case 18:
                 return "Supplier Raw Material Attachment";// 供应商原材料附件
+            case 19:
+                return "OA"; //OA
             default:
                 return null;
         }
