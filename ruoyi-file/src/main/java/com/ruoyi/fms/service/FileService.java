@@ -89,6 +89,8 @@ public class FileService {
                 return "CAL"; // Calculation Report (计算书)
             case 18:
                 return "SRA"; //Supplier Raw Material Attachment
+            case 19:
+                return "OA";
             default:
                 return "UNK"; // Unknown
         }

@@ -35,7 +35,7 @@ import java.util.zip.ZipOutputStream;
  * FtpService 负责处理与 FTP 服务器的连接、上传、下载和删除文件操作。
  */
 @Service
-public class FtpService {
+public class    FtpService {
     @Resource
     private FileService fileService;       // 查询 fileURL 的 Service
     @Resource
@@ -792,5 +792,7 @@ public class FtpService {
 
             return resp;
         }
+
+
 }
 

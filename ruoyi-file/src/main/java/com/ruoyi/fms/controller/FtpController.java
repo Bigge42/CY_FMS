@@ -723,4 +723,101 @@ public class FtpController {
         }
     }
 
+
+    /**
+     * 批量上传接口：
+     *  1. documentTypeID 默认为 19；
+     *  2. createdBy 默认为 "OA"；
+     *  3. 文件名保持原名，不追加后缀；
+     *  4. 保存到 FTP 上以 matchID 命名的文件夹（不存在则新建）；
+     *  5. 返回所有 fileID 列表
+     */
+    @Anonymous
+    @PostMapping("/batchProcessUpload")
+    public AjaxResult batchProcessUpload(
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam("matchID") String matchID,
+            @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
+            @RequestParam(value = "convertToPdf", defaultValue = "false") boolean convertToPdf) {
+
+        if (files == null || files.length == 0) {
+            return AjaxResult.error("请至少上传一个文件");
+        }
+        if (matchID == null || matchID.trim().isEmpty()) {
+            return AjaxResult.error("matchID 不能为空");
+        }
+
+        List<String> fileIds = new ArrayList<>();
+        for (MultipartFile file : files) {
+            Response resp = oaProcessFileUpload(
+                    file,
+                    19,               // 默认 documentTypeID
+                    matchID,
+                    planTrackingNumber,
+                    convertToPdf,
+                    "OA"              // 默认 createdBy
+            );
+            if (resp.getCode() != 200) {
+                return AjaxResult.error("上传失败: " + resp.getMsg());
+            }
+            fileIds.add(resp.getData());
+        }
+        return AjaxResult.success(fileIds);
+    }
+
+    private Response oaProcessFileUpload(
+            MultipartFile file,
+            Integer documentTypeID,
+            String matchID,
+            String planTrackingNumber,
+            boolean convertToPdf,
+            String createdBy) {
+
+        // 1. 基本校验
+        if (file.isEmpty()) {
+            return Response.error("上传的文件为空");
+        }
+        if (matchID.trim().isEmpty()) {
+            return Response.error("matchID 不能为空");
+        }
+        String documentTypeName = getDocumentTypeName(documentTypeID);
+        if (documentTypeName == null || !ALLOWED_DOCUMENT_TYPES.contains(documentTypeName)) {
+            return Response.error("不支持的文档类型ID: " + documentTypeID);
+        }
+
+        try {
+            // 2. 保留原始文件名
+            String originalName = file.getOriginalFilename();
+            // 3. 计算编码后文件名仅用于本地存储
+            String encodedName = URLEncoder.encode(originalName, StandardCharsets.UTF_8.name());
+
+            // 4. 本地临时存储（使用 encodedName）
+            String tempDir = ftpService.getTempDir();
+            File tmpDir = new File(tempDir);
+            if (!tmpDir.exists() && !tmpDir.mkdirs()) {
+                return Response.error("无法创建临时目录: " + tempDir);
+            }
+            String localPath = tempDir + File.separator + encodedName;
+            file.transferTo(new File(localPath));  // 或带 PDF 转换逻辑
+
+            // 5. 直接上传到 /OA/{matchID}，FTP 端文件名用 originalName（解码后）
+            String remoteFolder = ftpService.getRemoteFolderPath("/OA/" + matchID);
+            if (!ftpService.uploadFile(localPath, remoteFolder, originalName)) {
+                return Response.error("文件上传到 FTP 失败");
+            }
+
+            // 6. 删除本地临时文件
+            new File(localPath).delete();
+
+            // 7. 返回 fileID
+            String fileID = fileService.generateFileID(documentTypeID);
+            return Response.success("文件上传成功", fileID);
+
+        } catch (Exception e) {
+            log.error("文件上传失败", e);
+            return Response.error(e.getMessage());
+        }
+
+    }
+
 }
