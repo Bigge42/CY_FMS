@@ -8,7 +8,7 @@ spring:
             master:
                 #url: jdbc:mysql://10.11.0.20:3306/cy_file?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true
                 url: jdbc:mysql://127.0.0.1:3306/cy_file_test?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true
-                #url: jdbc:mysql://10.11.0.20:3306/cy_file_test?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true
+                #url: jdbc:mysql://10.11.0.20:3306/cy_file_test?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true
                 username: root
                 password: mF9vQ7b3Nw2kL1xZ4sYvT6uR8hK3pQ==
             # 从库数据源

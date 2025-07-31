@@ -777,7 +777,7 @@ public class FtpController {
         if (file.isEmpty()) {
             return Response.error("上传的文件为空");
         }
-        if (matchID.trim().isEmpty()) {
+        if (matchID == null || matchID.trim().isEmpty()) {
             return Response.error("matchID 不能为空");
         }
         String documentTypeName = getDocumentTypeName(documentTypeID);
@@ -786,27 +786,29 @@ public class FtpController {
         }
 
         try {
-            // 2. 保留原始文件名
+            // 2. 原始文件名 & 百分号编码名
             String originalName = file.getOriginalFilename();
-            // 3. 计算编码后文件名仅用于本地存储
-            String encodedName = URLEncoder.encode(originalName, StandardCharsets.UTF_8.name());
+            String encodedName  = URLEncoder.encode(originalName, StandardCharsets.UTF_8.name());
 
-            // 4. 本地临时存储（使用 encodedName）
+            // 3. 本地临时存储（encodedName）
             String tempDir = ftpService.getTempDir();
             File tmpDir = new File(tempDir);
             if (!tmpDir.exists() && !tmpDir.mkdirs()) {
                 return Response.error("无法创建临时目录: " + tempDir);
             }
             String localPath = tempDir + File.separator + encodedName;
-            file.transferTo(new File(localPath));  // 或带 PDF 转换逻辑
+            file.transferTo(new File(localPath));  // 可在此插入 PDF 转换逻辑
 
-            // 5. 直接上传到 /OA/{matchID}，FTP 端文件名用 originalName（解码后）
-            String remoteFolder = ftpService.getRemoteFolderPath("/OA/" + matchID);
-            if (!ftpService.uploadFile(localPath, remoteFolder, originalName)) {
-                return Response.error("文件上传到 FTP 失败");
+            // 4. 计算远程子目录（不以 "/" 开头）
+            String subFolder = "OA/" + matchID;
+
+            // 5. 方案2：上传带编码名，再通过 listFiles() 拿到服务器实际名，最后重命名回原名
+            boolean ok = ftpService.uploadThenRenameByListing(localPath, subFolder, originalName);
+            if (!ok) {
+                return Response.error("上传并重命名失败");
             }
 
-            // 6. 删除本地临时文件
+            // 6. 清理本地临时文件
             new File(localPath).delete();
 
             // 7. 返回 fileID
@@ -817,7 +819,7 @@ public class FtpController {
             log.error("文件上传失败", e);
             return Response.error(e.getMessage());
         }
-
     }
+
 
 }

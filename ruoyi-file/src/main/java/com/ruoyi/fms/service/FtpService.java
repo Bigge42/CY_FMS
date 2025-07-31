@@ -794,5 +794,113 @@ public class    FtpService {
         }
 
 
+    /**
+     * 上传并重命名（覆盖同名）：
+     * 1. 使用 ASCII 临时名上传
+     * 2. 删除旧文件
+     * 3. 重命名为中文原名（GBK->ISO-8859-1）
+     *
+     * @param localFilePath 本地文件绝对路径
+     * @param subFolder     目标子目录（不含前导 '/']
+     * @param originalName  原始文件名（含中文/空格）
+     * @return true 成功，否则 false
+     */
+    /**
+     * 上传并重命名：
+     * 1. 使用纯 ASCII 临时名上传
+     * 2. 为同名文件自动添加后缀（_A、_B...）
+     * 3. 同一会话中，用 GBK 控制通道重命名为中文原名或带后缀的目标名
+     *
+     * @param localFilePath 本地文件绝对路径
+     * @param subFolder     目标子目录（不含前导 '/'）
+     * @param originalName  原始文件名（含中文/空格）
+     * @return true 成功，否则 false
+     */
+    public boolean uploadThenRenameByListing(String localFilePath,
+                                             String subFolder,
+                                             String originalName) {
+        FTPClient ftp = new FTPClient();
+        try {
+            // 1. 连接并登录
+            connectAndLogin(ftp);
+
+            // 2. 控制通道使用 GBK (关闭 UTF-8)
+            ftp.setControlEncoding("GBK");
+            ftp.sendCommand("OPTS UTF8", "OFF");
+            ftp.setFileType(FTP.BINARY_FILE_TYPE);
+            ftp.enterLocalPassiveMode();
+
+            // 3. 确保并进入目标目录
+            mkdirsSilent(ftp, subFolder);
+            if (!ftp.changeWorkingDirectory(subFolder)) {
+                log.error("切换目录失败：{}", subFolder);
+                return false;
+            }
+
+            // 4. 上传临时文件 (纯 ASCII 名)
+            String tempName = UUID.randomUUID().toString() + ".tmp";
+            try (InputStream in = new FileInputStream(localFilePath)) {
+                if (!ftp.storeFile(tempName, in)) {
+                    log.error("临时文件上传失败：{}", ftp.getReplyString());
+                    return false;
+                }
+            }
+
+            // 可选：打印目录确认
+            String[] names = ftp.listNames();
+            Set<String> existing = new HashSet<>(Arrays.asList(names));
+            for (String name : existing) {
+                log.info("[服务器文件] {}", name);
+            }
+
+            // 5. 生成目标文件名，若已存在则追加后缀 _A、_B...
+            String targetName = originalName;
+            if (existing.contains(targetName)) {
+                String base = originalName;
+                String ext = "";
+                int dot = originalName.lastIndexOf('.');
+                if (dot != -1) {
+                    base = originalName.substring(0, dot);
+                    ext = originalName.substring(dot);
+                }
+                char suffix = 'A';
+                while (existing.contains(base + "_" + suffix + ext)) {
+                    suffix++;
+                }
+                targetName = base + "_" + suffix + ext;
+            }
+
+            // 6. 重命名为目标名 (GBK->ISO-8859-1)
+            String isoTarget = new String(targetName.getBytes("GBK"), "ISO-8859-1");
+            if (!ftp.rename(tempName, isoTarget)) {
+                log.error("重命名失败：{} -> {}，{}", tempName, targetName, ftp.getReplyString());
+                return false;
+            }
+
+            return true;
+        } catch (IOException e) {
+            log.error("上传并重命名异常", e);
+            return false;
+        } finally {
+            disconnect(ftp);
+        }
+    }
+
+
+    /**
+     * 递归创建远程目录：静默失败
+     */
+    private void mkdirsSilent(FTPClient ftp, String dirPath) throws IOException {
+        String[] parts = dirPath.split("/");
+        StringBuilder path = new StringBuilder();
+        for (String p : parts) {
+            path.append("/").append(p);
+            ftp.makeDirectory(path.toString());
+        }
+    }
+    /** 构造完整远程路径，去掉前导“/”并加上 base */
+    private String buildRemotePath(String subFolder) {
+        return subFolder.startsWith("/") ? subFolder.substring(1) : subFolder;
+    }
 }
 
