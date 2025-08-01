@@ -787,8 +787,10 @@ public class FtpController {
 
         try {
             // 2. 原始文件名 & 百分号编码名
-            String originalName = file.getOriginalFilename();
+            String rawName      = file.getOriginalFilename();
+            String originalName = URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
             String encodedName  = URLEncoder.encode(originalName, StandardCharsets.UTF_8.name());
+            log.info("originalName='{}', rawName='{}'", originalName, rawName);
 
             // 3. 本地临时存储（encodedName）
             String tempDir = ftpService.getTempDir();
@@ -802,7 +804,7 @@ public class FtpController {
             // 4. 计算远程子目录（不以 "/" 开头）
             String subFolder = "OA/" + matchID;
 
-            // 5. 方案2：上传带编码名，再通过 listFiles() 拿到服务器实际名，最后重命名回原名
+            // 5. 上传带编码名，再通过 listFiles() 拿到服务器实际名，最后重命名回原名
             boolean ok = ftpService.uploadThenRenameByListing(localPath, subFolder, originalName);
             if (!ok) {
                 return Response.error("上传并重命名失败");
