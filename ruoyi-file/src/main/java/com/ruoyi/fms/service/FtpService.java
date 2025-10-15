@@ -618,7 +618,7 @@ public class    FtpService {
                     StandardCharsets.ISO_8859_1
             );
             String cd = String.format(
-                    "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+                    "inline; filename=\"%s\"; filename*=UTF-8''%s",//"attachment; filename=\"%s\"; filename*=UTF-8''%s"
                     fallback, pct
             );
             response.reset();

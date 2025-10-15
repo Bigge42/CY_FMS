@@ -786,34 +786,34 @@ public class FtpController {
         }
 
         try {
-            // 2. 原始文件名 & 百分号编码名
-            String rawName      = file.getOriginalFilename();
+            // 1. 拿到浏览器上传前的原始文件名（含中文）
+            String rawName = file.getOriginalFilename();
             String originalName = URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
-            String encodedName  = URLEncoder.encode(originalName, StandardCharsets.UTF_8.name());
             log.info("originalName='{}', rawName='{}'", originalName, rawName);
 
-            // 3. 本地临时存储（encodedName）
+            // 2. 本地临时存储（直接用 originalName）
             String tempDir = ftpService.getTempDir();
             File tmpDir = new File(tempDir);
             if (!tmpDir.exists() && !tmpDir.mkdirs()) {
                 return Response.error("无法创建临时目录: " + tempDir);
             }
-            String localPath = tempDir + File.separator + encodedName;
-            file.transferTo(new File(localPath));  // 可在此插入 PDF 转换逻辑
+            // 这里不用再 URL 编码，直接用 originalName
+            String localPath = tempDir + File.separator + originalName;
+            file.transferTo(new File(localPath));  // 如果有 PDF 转换逻辑，也放在这里
 
-            // 4. 计算远程子目录（不以 "/" 开头）
+            // 3. 计算远程子目录
             String subFolder = "OA/" + matchID;
 
-            // 5. 上传带编码名，再通过 listFiles() 拿到服务器实际名，最后重命名回原名
+            // 4. 上传并重命名（uploadThenRenameByListing 方法里会先上传，再把服务器上的文件改成 originalName）
             boolean ok = ftpService.uploadThenRenameByListing(localPath, subFolder, originalName);
             if (!ok) {
                 return Response.error("上传并重命名失败");
             }
 
-            // 6. 清理本地临时文件
+            // 5. 清理本地临时文件
             new File(localPath).delete();
 
-            // 7. 返回 fileID
+            // 6. 返回 fileID
             String fileID = fileService.generateFileID(documentTypeID);
             return Response.success("文件上传成功", fileID);
 
@@ -822,6 +822,5 @@ public class FtpController {
             return Response.error(e.getMessage());
         }
     }
-
 
 }
