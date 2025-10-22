@@ -529,7 +529,11 @@ public class    FtpService {
             ftp.enterLocalPassiveMode();
             ftp.setFileType(FTP.BINARY_FILE_TYPE);
 
-            if (sanitized.contains(".")) {
+
+            boolean hasDotOrDash = sanitized.contains(".") || sanitized.contains("-");
+            boolean hasPCode = sanitized.matches("(?i).*P\\d{10}.*");
+
+            if (hasDotOrDash || hasPCode) {
                 // SMT 路径
                 String dir = "/SMT/smtpdf";
                 if (ftp.changeWorkingDirectory(dir)) {
