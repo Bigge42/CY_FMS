@@ -36,8 +36,6 @@ ftp:
   password: Server20
   remote-dir:
 
-
-
 # 临时目录配置
   fms:
     temp:
