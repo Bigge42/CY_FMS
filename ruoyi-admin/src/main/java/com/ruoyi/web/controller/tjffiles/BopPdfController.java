@@ -1,5 +1,6 @@
 package com.ruoyi.web.controller.tjffiles;
 
+import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.system.service.BopPdfFetcherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.io.FileInputStream;
 
 @RestController
+@Anonymous
 public class BopPdfController {
 
     @Autowired
