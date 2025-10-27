@@ -14,6 +14,7 @@ import org.springframework.util.StreamUtils;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.SocketTimeoutException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +28,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -823,8 +825,41 @@ public class    FtpService {
     public boolean uploadThenRenameByListing(String localFilePath,
                                              String subFolder,
                                              String originalName) {
+        try (InputStream inputStream = new FileInputStream(localFilePath)) {
+            return uploadThenRenameByListing(inputStream, subFolder, originalName);
+        } catch (IOException e) {
+            log.error("读取本地文件失败: {}", localFilePath, e);
+            return false;
+        }
+    }
+
+    /**
+     * 上传并重命名，支持直接传入 InputStream，避免本地落盘。
+     *
+     * @param inputStream  输入流
+     * @param subFolder    目标子目录（不含前导 '/'）
+     * @param originalName 原始文件名（含中文/空格）
+     * @return true 成功，否则 false
+     */
+    public boolean uploadThenRenameByListing(InputStream inputStream,
+                                             String subFolder,
+                                             String originalName) {
         FTPClient ftp = new FTPClient();
         try {
+            // 上传大文件时提前设置超时及缓冲区，减少阻塞
+            int connectTimeout = (int) TimeUnit.SECONDS.toMillis(30);
+            int dataTimeout = (int) TimeUnit.MINUTES.toMillis(30);
+            int keepAlive = 60;
+            int bufferSize = 4 * 1024 * 1024;
+
+            ftp.setConnectTimeout(connectTimeout);
+            ftp.setDataTimeout(dataTimeout);
+            ftp.setControlKeepAliveTimeout(keepAlive);
+            ftp.setBufferSize(bufferSize);
+
+            log.info("FTP 上传超时参数设置：connectTimeout={}ms, dataTimeout={}ms, keepAlive={}s, bufferSize={}bytes",
+                    connectTimeout, dataTimeout, keepAlive, bufferSize);
+
             // 1. 连接并登录
             connectAndLogin(ftp);
 
@@ -843,11 +878,18 @@ public class    FtpService {
 
             // 4. 上传临时文件 (纯 ASCII 名)
             String tempName = UUID.randomUUID().toString() + ".tmp";
-            try (InputStream in = new FileInputStream(localFilePath)) {
+            long start = System.currentTimeMillis();
+            try (InputStream in = inputStream) {
                 if (!ftp.storeFile(tempName, in)) {
                     log.error("临时文件上传失败：{}", ftp.getReplyString());
                     return false;
                 }
+            }
+            long duration = System.currentTimeMillis() - start;
+            if (duration >= dataTimeout) {
+                log.warn("临时文件上传耗时 {} ms，已接近或超过数据超时阈值 {} ms", duration, dataTimeout);
+            } else {
+                log.info("临时文件上传耗时 {} ms", duration);
             }
 
             // 可选：打印目录确认
@@ -882,6 +924,9 @@ public class    FtpService {
             }
 
             return true;
+        } catch (SocketTimeoutException e) {
+            log.error("FTP 上传过程中发生超时，目录：{}，文件：{}，原因：{}", subFolder, originalName, e.getMessage(), e);
+            return false;
         } catch (IOException e) {
             log.error("上传并重命名异常", e);
             return false;

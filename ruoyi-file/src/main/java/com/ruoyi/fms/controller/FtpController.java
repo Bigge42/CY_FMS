@@ -422,7 +422,8 @@ public class FtpController {
         String timestamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
 
         // 处理原始文件名
-        String originalFileName = file.getOriginalFilename();
+        String originalUploadName = file.getOriginalFilename();
+        String originalFileName = originalUploadName;
         if (originalFileName == null) {
             originalFileName = "unknown";
         }
@@ -439,7 +440,7 @@ public class FtpController {
         } else {
             // 若不转换，保留原扩展名（通过 MultipartFile 重新获取原始扩展名）
             String ext = "";
-            String ori = file.getOriginalFilename();
+            String ori = originalUploadName;
             if (ori != null && ori.lastIndexOf('.') != -1) {
                 ext = ori.substring(ori.lastIndexOf('.'));
             }
@@ -452,36 +453,46 @@ public class FtpController {
             String encodedFileName = URLEncoder.encode(newFileName, StandardCharsets.UTF_8.toString());
             log.info("文件名经过 URL 编码处理: {}", encodedFileName);
 
-            // 获取临时存储目录（通过 ftpService 提供）
+            // 1. 本地临时存储
             String tempDir = ftpService.getTempDir();
-            File tempDirectory = new File(tempDir);
-            if (!tempDirectory.exists() && !tempDirectory.mkdirs()) {
+            File tmpDir = new File(tempDir);
+            if (!tmpDir.exists() && !tmpDir.mkdirs()) {
                 log.warn("无法创建临时目录: {}", tempDir);
                 return Response.error("无法创建临时目录: " + tempDir);
             }
 
-            // 定义本地文件路径：如果转换为 PDF，需要先保存原始文件再转换，否则直接保存目标文件
-            String localOriginalPath = tempDir + originalFileName + "_" + timestamp;
-            String localTargetPath = tempDir + encodedFileName;
+            // 这里不用再 URL 编码，直接用生成后的文件名（含时间戳）
+            File localTargetFile = Paths.get(tempDir, newFileName).toFile();
+            File localSourceFile = null;
 
             try {
                 if (convertToPdf) {
-                    // 保存上传的原始文件到本地，用于转换
-                    File localOriginalFile = new File(localOriginalPath);
-                    file.transferTo(localOriginalFile);
-                    log.info("原始文件保存到本地临时路径: {}", localOriginalPath);
+                    // 保存原始文件，供后续转换使用
+                    String sourceFileName = originalUploadName;
+                    if (sourceFileName == null || sourceFileName.trim().isEmpty()) {
+                        sourceFileName = originalFileName + "_" + timestamp;
+                    } else {
+                        int unixIndex = sourceFileName.lastIndexOf('/');
+                        int winIndex = sourceFileName.lastIndexOf('\\');
+                        int sepIndex = Math.max(unixIndex, winIndex);
+                        if (sepIndex >= 0 && sepIndex + 1 < sourceFileName.length()) {
+                            sourceFileName = sourceFileName.substring(sepIndex + 1);
+                        }
+                    }
+                    localSourceFile = Paths.get(tempDir, sourceFileName).toFile();
+                    file.transferTo(localSourceFile);
+                    log.info("原始文件保存到本地临时路径: {}", localSourceFile.getAbsolutePath());
 
                     // 调用转换方法，将原始文件转换为 PDF
-                    boolean conversionResult = convertToPdf(localOriginalFile, new File(localTargetPath));
+                    boolean conversionResult = convertToPdf(localSourceFile, localTargetFile);
                     if (!conversionResult) {
                         log.error("文件转换为 PDF 失败");
                         return Response.error("文件转换为 PDF 失败");
                     }
-                    log.info("文件成功转换为 PDF: {}", localTargetPath);
+                    log.info("文件成功转换为 PDF: {}", localTargetFile.getAbsolutePath());
                 } else {
-                    // 不转换：直接将上传的文件保存到目标路径
-                    file.transferTo(new File(localTargetPath));
-                    log.info("文件保存到本地临时路径: {}", localTargetPath);
+                    file.transferTo(localTargetFile);
+                    log.info("文件保存到本地临时路径: {}", localTargetFile.getAbsolutePath());
                 }
 
                 // 查找或创建对应的文件夹（例如以文档类型名称命名）
@@ -489,7 +500,7 @@ public class FtpController {
                 String remoteFolderPath = ftpService.getRemoteFolderPath(folder.getPhysicalPath());
 
                 // 上传目标文件到 FTP 服务器
-                boolean uploadResult = ftpService.uploadFile(localTargetPath, remoteFolderPath, encodedFileName);
+                boolean uploadResult = ftpService.uploadFile(localTargetFile.getAbsolutePath(), remoteFolderPath, encodedFileName);
                 if (!uploadResult) {
                     log.error("文件上传到 FTP 失败: {}", encodedFileName);
                     return Response.error("文件上传到 FTP 失败");
@@ -528,22 +539,19 @@ public class FtpController {
                 log.info("文件记录已插入数据库: 文件名={}, 文件夹编码={}, 文件ID={}",
                         cyFile.getFileName(), folder.getFolderCode(), cyFile.getFileID());
 
-                // 清理本地临时文件
-                if (convertToPdf) {
-                    File origFile = new File(localOriginalPath);
-                    File pdfFile = new File(localTargetPath);
-                    boolean deletedOrig = origFile.delete();
-                    boolean deletedPdf = pdfFile.delete();
-                    log.info("临时文件删除结果: 原始文件删除{}，PDF文件删除{}", deletedOrig ? "成功" : "失败", deletedPdf ? "成功" : "失败");
-                } else {
-                    boolean deleted = new File(localTargetPath).delete();
-                    log.info("临时文件删除{}", deleted ? "成功" : "失败");
-                }
-
-                return Response.success("文件上传成功并已存  储到数据库", cyFile.getFileID());
+                return Response.success("文件上传成功并已存储到数据库", cyFile.getFileID());
             } catch (Exception e) {
                 log.error("文件上传或处理失败: {}", e.getMessage(), e);
                 return Response.error("文件上传或处理失败: " + e.getMessage());
+            } finally {
+                if (convertToPdf) {
+                    if (localSourceFile != null && localSourceFile.exists() && !localSourceFile.delete()) {
+                        log.warn("原始临时文件删除失败: {}", localSourceFile.getAbsolutePath());
+                    }
+                }
+                if (localTargetFile.exists() && !localTargetFile.delete()) {
+                    log.warn("目标临时文件删除失败: {}", localTargetFile.getAbsolutePath());
+                }
             }
         } catch (Exception e) {
             log.error("文件名编码失败: {}", e.getMessage());
@@ -785,33 +793,80 @@ public class FtpController {
             return Response.error("不支持的文档类型ID: " + documentTypeID);
         }
 
+        File tempDir = null;
+        File localSourceFile = null;
+        File localTargetFile = null;
         try {
             // 1. 拿到浏览器上传前的原始文件名（含中文）
             String rawName = file.getOriginalFilename();
-            String originalName = URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
-            log.info("originalName='{}', rawName='{}'", originalName, rawName);
-
-            // 2. 本地临时存储（直接用 originalName）
-            String tempDir = ftpService.getTempDir();
-            File tmpDir = new File(tempDir);
-            if (!tmpDir.exists() && !tmpDir.mkdirs()) {
-                return Response.error("无法创建临时目录: " + tempDir);
+            String decodedName = rawName;
+            try {
+                decodedName = rawName == null ? null : URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
+            } catch (IllegalArgumentException decodeEx) {
+                log.warn("原始文件名 URL 解码失败，继续使用原值: {}", rawName);
             }
-            // 这里不用再 URL 编码，直接用 originalName
-            String localPath = tempDir + File.separator + originalName;
-            file.transferTo(new File(localPath));  // 如果有 PDF 转换逻辑，也放在这里
+            if (decodedName == null || decodedName.trim().isEmpty()) {
+                decodedName = "unknown";
+            }
+            // 去掉可能包含的路径分隔符，仅保留文件名
+            decodedName = decodedName.replace('\\', '/');
+            if (decodedName.contains("/")) {
+                decodedName = decodedName.substring(decodedName.lastIndexOf('/') + 1);
+            }
 
-            // 3. 计算远程子目录
+            log.info("originalName='{}', rawName='{}'", decodedName, rawName);
+
+            // 2. 计算远程子目录
             String subFolder = "OA/" + matchID;
 
-            // 4. 上传并重命名（uploadThenRenameByListing 方法里会先上传，再把服务器上的文件改成 originalName）
-            boolean ok = ftpService.uploadThenRenameByListing(localPath, subFolder, originalName);
-            if (!ok) {
-                return Response.error("上传并重命名失败");
+            // 3. 构造临时目录
+            String baseTempDir = ftpService.getTempDir();
+            tempDir = Paths.get(baseTempDir, "oa", matchID + "_" + System.nanoTime()).toFile();
+            if (!tempDir.exists() && !tempDir.mkdirs()) {
+                log.warn("无法创建临时目录: {}", tempDir.getAbsolutePath());
+                return Response.error("无法创建临时目录");
             }
 
-            // 5. 清理本地临时文件
-            new File(localPath).delete();
+            // 4. 将上传内容落盘，必要时进行 PDF 转换
+            String targetFileName = decodedName;
+            if (convertToPdf && !decodedName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+                int dot = decodedName.lastIndexOf('.');
+                if (dot > -1) {
+                    targetFileName = decodedName.substring(0, dot) + ".pdf";
+                } else {
+                    targetFileName = decodedName + ".pdf";
+                }
+            }
+
+            if (convertToPdf) {
+                localSourceFile = new File(tempDir, decodedName);
+                file.transferTo(localSourceFile);
+                log.info("原始文件已写入临时路径: {}", localSourceFile.getAbsolutePath());
+
+                localTargetFile = new File(tempDir, targetFileName);
+                if (!decodedName.equalsIgnoreCase(targetFileName)) {
+                    boolean conversionResult = convertToPdf(localSourceFile, localTargetFile);
+                    if (!conversionResult) {
+                        log.error("文件转换 PDF 失败: {}", decodedName);
+                        return Response.error("文件转换 PDF 失败");
+                    }
+                    log.info("PDF 转换成功，结果文件: {}", localTargetFile.getAbsolutePath());
+                } else {
+                    // 原始文件本身就是 PDF，直接作为目标文件
+                    localTargetFile = localSourceFile;
+                }
+            } else {
+                localTargetFile = new File(tempDir, targetFileName);
+                file.transferTo(localTargetFile);
+                log.info("文件已写入临时路径: {}", localTargetFile.getAbsolutePath());
+            }
+
+            // 5. 上传到 FTP
+            boolean ok = ftpService.uploadThenRenameByListing(localTargetFile.getAbsolutePath(), subFolder, targetFileName);
+            if (!ok) {
+                log.error("上传 FTP 失败，目录: {}, 文件: {}", subFolder, targetFileName);
+                return Response.error("上传并重命名失败");
+            }
 
             // 6. 返回 fileID
             String fileID = fileService.generateFileID(documentTypeID);
@@ -820,6 +875,16 @@ public class FtpController {
         } catch (Exception e) {
             log.error("文件上传失败", e);
             return Response.error(e.getMessage());
+        } finally {
+            if (convertToPdf && localSourceFile != null && localSourceFile != localTargetFile) {
+                FileUtils.deleteQuietly(localSourceFile);
+            }
+            if (localTargetFile != null) {
+                FileUtils.deleteQuietly(localTargetFile);
+            }
+            if (tempDir != null) {
+                FileUtils.deleteQuietly(tempDir);
+            }
         }
     }
 

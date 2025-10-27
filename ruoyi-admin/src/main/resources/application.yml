@@ -44,6 +44,8 @@ ftp:
 server:
   # 服务器的HTTP端口，默认为8080
   port: 8088
+  # 上传大文件容易耗时，适当放宽连接超时时间
+  connection-timeout: 600s
   servlet:
     # 应用的访问路径
     context-path: /
@@ -52,6 +54,13 @@ server:
     uri-encoding: UTF-8
     # 连接数满后的排队数，默认为100
     accept-count: 1000
+    # 允许处理超大表单内容，防止文件上传时被吞掉
+    max-http-form-post-size: -1
+    max-swallow-size: -1
+    # 允许超大 POST 请求体，避免上传过程中被提前终止
+    max-http-post-size: -1
+    # 长时间上传保持连接
+    keep-alive-timeout: 600s
     threads:
       # tomcat最大线程数，默认为200
       max: 800
@@ -83,10 +92,14 @@ spring:
   # 文件上传
   servlet:
     multipart:
+      # 将文件直接写入本地磁盘临时目录，避免内存撑爆
+      location: ${ftp.fms.temp.dir}
       # 单个文件大小
-      max-file-size: 1024MB
+      max-file-size: 4096MB
       # 设置总上传的文件大小
-      max-request-size: 1024MB
+      max-request-size: 8192MB
+      # 超过该阈值立即写入磁盘，降低内存压力
+      file-size-threshold: 10MB
   # 服务模块
   devtools:
     restart:

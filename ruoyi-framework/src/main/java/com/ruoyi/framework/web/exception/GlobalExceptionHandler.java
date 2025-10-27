@@ -4,6 +4,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MultipartException;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.text.Convert;
@@ -38,6 +40,24 @@ public class GlobalExceptionHandler
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}',权限校验失败'{}'", requestURI, e.getMessage());
         return AjaxResult.error(HttpStatus.FORBIDDEN, "没有权限，请联系管理员授权");
+    }
+
+    /**
+     * 处理上传解析异常
+     */
+    @ExceptionHandler(MultipartException.class)
+    public AjaxResult handleMultipartException(MultipartException e, HttpServletRequest request)
+    {
+        String requestURI = request.getRequestURI();
+        ClientAbortException clientAbort = findCause(e, ClientAbortException.class);
+        if (clientAbort != null)
+        {
+            log.warn("请求地址'{}', 客户端中断上传连接: {}", requestURI, clientAbort.getMessage());
+            return AjaxResult.error(HttpStatus.BAD_REQUEST, "客户端已中断上传连接，请确认网络状态后重试");
+        }
+        log.error("请求地址'{}', 解析上传请求失败", requestURI, e);
+        String message = e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage();
+        return AjaxResult.error("上传文件解析失败: " + message);
     }
 
     /**
@@ -141,5 +161,19 @@ public class GlobalExceptionHandler
     public AjaxResult handleDemoModeException(DemoModeException e)
     {
         return AjaxResult.error("演示模式，不允许操作");
+    }
+
+    private <T extends Throwable> T findCause(Throwable throwable, Class<T> targetType)
+    {
+        Throwable cause = throwable;
+        while (cause != null)
+        {
+            if (targetType.isInstance(cause))
+            {
+                return targetType.cast(cause);
+            }
+            cause = cause.getCause();
+        }
+        return null;
     }
 }
