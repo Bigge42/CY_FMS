@@ -48,6 +48,9 @@ server:
     # 应用的访问路径
     context-path: /
   tomcat:
+    connection-timeout: 600s        # 等待请求行/首部的超时
+    keep-alive-timeout: 600s         # Keep-Alive 空闲超时（不设则用上面的值）
+    max-swallow-size: -1             # 建议保留：避免大请求出错后“吞咽”导致断连
     # tomcat的URI编码
     uri-encoding: UTF-8
     # 连接数满后的排队数，默认为100
@@ -87,6 +90,8 @@ spring:
       max-file-size: 1024MB
       # 设置总上传的文件大小
       max-request-size: 1024MB
+
+
   # 服务模块
   devtools:
     restart:
