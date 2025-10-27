@@ -793,34 +793,98 @@ public class FtpController {
             return Response.error("不支持的文档类型ID: " + documentTypeID);
         }
 
+        File tempDir = null;
+        File localSourceFile = null;
+        File localTargetFile = null;
         try {
             // 1. 拿到浏览器上传前的原始文件名（含中文）
             String rawName = file.getOriginalFilename();
-            String originalName = URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
-            log.info("originalName='{}', rawName='{}'", originalName, rawName);
+            String decodedName = rawName;
+            try {
+                decodedName = rawName == null ? null : URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
+            } catch (IllegalArgumentException decodeEx) {
+                log.warn("原始文件名 URL 解码失败，继续使用原值: {}", rawName);
+            }
+            if (decodedName == null || decodedName.trim().isEmpty()) {
+                decodedName = "unknown";
+            }
+            // 去掉可能包含的路径分隔符，仅保留文件名
+            decodedName = decodedName.replace('\\', '/');
+            if (decodedName.contains("/")) {
+                decodedName = decodedName.substring(decodedName.lastIndexOf('/') + 1);
+            }
 
-            // 3. 计算远程子目录
+            log.info("originalName='{}', rawName='{}'", decodedName, rawName);
+
+            // 2. 计算远程子目录
             String subFolder = "OA/" + matchID;
 
-            // 4. 上传并重命名（uploadThenRenameByListing 方法里会先上传，再把服务器上的文件改成 originalName）
-            boolean ok;
-            try {
-                ok = ftpService.uploadThenRenameByListing(file.getInputStream(), subFolder, originalName);
-            } catch (IOException ioException) {
-                log.error("读取上传文件流失败", ioException);
-                return Response.error("读取上传文件流失败: " + ioException.getMessage());
+            // 3. 构造临时目录
+            String baseTempDir = ftpService.getTempDir();
+            tempDir = Paths.get(baseTempDir, "oa", matchID + "_" + System.nanoTime()).toFile();
+            if (!tempDir.exists() && !tempDir.mkdirs()) {
+                log.warn("无法创建临时目录: {}", tempDir.getAbsolutePath());
+                return Response.error("无法创建临时目录");
             }
+
+            // 4. 将上传内容落盘，必要时进行 PDF 转换
+            String targetFileName = decodedName;
+            if (convertToPdf && !decodedName.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+                int dot = decodedName.lastIndexOf('.');
+                if (dot > -1) {
+                    targetFileName = decodedName.substring(0, dot) + ".pdf";
+                } else {
+                    targetFileName = decodedName + ".pdf";
+                }
+            }
+
+            if (convertToPdf) {
+                localSourceFile = new File(tempDir, decodedName);
+                file.transferTo(localSourceFile);
+                log.info("原始文件已写入临时路径: {}", localSourceFile.getAbsolutePath());
+
+                localTargetFile = new File(tempDir, targetFileName);
+                if (!decodedName.equalsIgnoreCase(targetFileName)) {
+                    boolean conversionResult = convertToPdf(localSourceFile, localTargetFile);
+                    if (!conversionResult) {
+                        log.error("文件转换 PDF 失败: {}", decodedName);
+                        return Response.error("文件转换 PDF 失败");
+                    }
+                    log.info("PDF 转换成功，结果文件: {}", localTargetFile.getAbsolutePath());
+                } else {
+                    // 原始文件本身就是 PDF，直接作为目标文件
+                    localTargetFile = localSourceFile;
+                }
+            } else {
+                localTargetFile = new File(tempDir, targetFileName);
+                file.transferTo(localTargetFile);
+                log.info("文件已写入临时路径: {}", localTargetFile.getAbsolutePath());
+            }
+
+            // 5. 上传到 FTP
+            boolean ok = ftpService.uploadThenRenameByListing(localTargetFile.getAbsolutePath(), subFolder, targetFileName);
             if (!ok) {
+                log.error("上传 FTP 失败，目录: {}, 文件: {}", subFolder, targetFileName);
                 return Response.error("上传并重命名失败");
             }
 
-            // 5. 返回 fileID
+            // 6. 返回 fileID
             String fileID = fileService.generateFileID(documentTypeID);
             return Response.success("文件上传成功", fileID);
 
         } catch (Exception e) {
             log.error("文件上传失败", e);
             return Response.error(e.getMessage());
+        } finally {
+            if (convertToPdf && localSourceFile != null && localSourceFile != localTargetFile) {
+                FileUtils.deleteQuietly(localSourceFile);
+            }
+            if (localTargetFile != null) {
+                FileUtils.deleteQuietly(localTargetFile);
+            }
+            if (tempDir != null) {
+                FileUtils.deleteQuietly(tempDir);
+            }
         }
     }
 
