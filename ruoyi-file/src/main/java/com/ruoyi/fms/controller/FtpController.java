@@ -17,6 +17,7 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -724,103 +726,84 @@ public class FtpController {
     }
 
 
-    /**
-     * 批量上传接口：
-     *  1. documentTypeID 默认为 19；
-     *  2. createdBy 默认为 "OA"；
-     *  3. 文件名保持原名，不追加后缀；
-     *  4. 保存到 FTP 上以 matchID 命名的文件夹（不存在则新建）；
-     *  5. 返回所有 fileID 列表
-     */
     @Anonymous
-    @PostMapping("/batchProcessUpload")
+    @PostMapping(
+            value = "/batchProcessUpload",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
     public AjaxResult batchProcessUpload(
-            @RequestParam("files") MultipartFile[] files,
+            @RequestPart("files") List<MultipartFile> files,     // ✅ 用 @RequestPart
             @RequestParam("matchID") String matchID,
             @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
-            @RequestParam(value = "convertToPdf", defaultValue = "false") boolean convertToPdf) {
+            @RequestParam(value = "convertToPdf", defaultValue = "false") boolean convertToPdf) throws IOException {
 
-        if (files == null || files.length == 0) {
-            return AjaxResult.error("请至少上传一个文件");
+        if (files == null || files.isEmpty()) return AjaxResult.error("请至少上传一个文件");
+        if (matchID == null || matchID.trim().isEmpty()) return AjaxResult.error("matchID 不能为空");
+
+        final String tempDir = ftpService.getTempDir();          // 确保不是 null
+        if (tempDir == null || tempDir.trim().isEmpty()) {
+            return AjaxResult.error("临时目录未配置");
         }
-        if (matchID == null || matchID.trim().isEmpty()) {
-            return AjaxResult.error("matchID 不能为空");
+        File tmpRoot = new File(tempDir);
+        if (!tmpRoot.exists() && !tmpRoot.mkdirs()) {
+            return AjaxResult.error("无法创建临时目录: " + tempDir);
         }
 
         List<String> fileIds = new ArrayList<>();
-        for (MultipartFile file : files) {
-            Response resp = oaProcessFileUpload(
-                    file,
-                    19,               // 默认 documentTypeID
-                    matchID,
-                    planTrackingNumber,
-                    convertToPdf,
-                    "OA"              // 默认 createdBy
-            );
-            if (resp.getCode() != 200) {
-                return AjaxResult.error("上传失败: " + resp.getMsg());
+        for (MultipartFile mf : files) {
+            if (mf.isEmpty()) return AjaxResult.error("存在空文件");
+
+            // 1) 取原名（不要 URLDecode），并做 Windows 安全化
+            String rawName = mf.getOriginalFilename();
+            String originalName = (rawName == null || rawName.isEmpty()) ? "unnamed" : rawName;
+            String safeOriginalName = sanitizeWinFileName(originalName); // ✅ 仅用于远端重命名/展示
+            String ext = getExt(safeOriginalName);
+
+            // 2) 本地使用“安全临时名”（避免非法字符/重复/过长路径）
+            Path localPath = Files.createTempFile(tmpRoot.toPath(), "upload_", ext.isEmpty() ? "" : ("." + ext));
+
+            // 3) 流式落盘，避免一次性进内存
+            try (InputStream in = mf.getInputStream()) {
+                Files.copy(in, localPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException io) {
+                return AjaxResult.error("写入临时文件失败: " + io.getMessage());
             }
-            fileIds.add(resp.getData());
+
+            // 4) 计算远端子目录并上传（被动模式/二进制请在 ftpService 里确保）
+            String subFolder = "OA/" + matchID;
+            boolean ok = ftpService.uploadThenRenameByListing(localPath.toString(), subFolder, safeOriginalName);
+            try { Files.deleteIfExists(localPath); } catch (IOException ignore) {}
+
+            if (!ok) return AjaxResult.error("上传并重命名失败: " + safeOriginalName);
+
+            // 5) 生成 fileID
+            String fileID = fileService.generateFileID(19);
+            fileIds.add(fileID);
         }
         return AjaxResult.success(fileIds);
     }
 
-    private Response oaProcessFileUpload(
-            MultipartFile file,
-            Integer documentTypeID,
-            String matchID,
-            String planTrackingNumber,
-            boolean convertToPdf,
-            String createdBy) {
-
-        // 1. 基本校验
-        if (file.isEmpty()) {
-            return Response.error("上传的文件为空");
-        }
-        if (matchID == null || matchID.trim().isEmpty()) {
-            return Response.error("matchID 不能为空");
-        }
-        String documentTypeName = getDocumentTypeName(documentTypeID);
-        if (documentTypeName == null || !ALLOWED_DOCUMENT_TYPES.contains(documentTypeName)) {
-            return Response.error("不支持的文档类型ID: " + documentTypeID);
-        }
-
-        try {
-            // 1. 拿到浏览器上传前的原始文件名（含中文）
-            String rawName = file.getOriginalFilename();
-            String originalName = URLDecoder.decode(rawName, StandardCharsets.UTF_8.name());
-            log.info("originalName='{}', rawName='{}'", originalName, rawName);
-
-            // 2. 本地临时存储（直接用 originalName）
-            String tempDir = ftpService.getTempDir();
-            File tmpDir = new File(tempDir);
-            if (!tmpDir.exists() && !tmpDir.mkdirs()) {
-                return Response.error("无法创建临时目录: " + tempDir);
-            }
-            // 这里不用再 URL 编码，直接用 originalName
-            String localPath = tempDir + File.separator + originalName;
-            file.transferTo(new File(localPath));  // 如果有 PDF 转换逻辑，也放在这里
-
-            // 3. 计算远程子目录
-            String subFolder = "OA/" + matchID;
-
-            // 4. 上传并重命名（uploadThenRenameByListing 方法里会先上传，再把服务器上的文件改成 originalName）
-            boolean ok = ftpService.uploadThenRenameByListing(localPath, subFolder, originalName);
-            if (!ok) {
-                return Response.error("上传并重命名失败");
-            }
-
-            // 5. 清理本地临时文件
-            new File(localPath).delete();
-
-            // 6. 返回 fileID
-            String fileID = fileService.generateFileID(documentTypeID);
-            return Response.success("文件上传成功", fileID);
-
-        } catch (Exception e) {
-            log.error("文件上传失败", e);
-            return Response.error(e.getMessage());
-        }
+    /** 仅去掉 Windows 非法字符，并处理保留名/结尾空格点/过长等 */
+    private static String sanitizeWinFileName(String name) {
+        String trimmed = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        // 保留名处理
+        String base = trimmed.replaceAll("[. ]+$", ""); // 去掉结尾的点/空格
+        if (base.isEmpty()) base = "unnamed";
+        String upper = base.toUpperCase();
+        Set<String> reserved = new HashSet<>(Arrays.asList(
+                "CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
+                "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"
+        ));
+        if (reserved.contains(upper)) base = "_" + base;
+        // Windows 总路径限制 ~260（经典路径），这里仅限制文件名长度，给路径留余量
+        return base.length() > 180 ? base.substring(0, 180) : base;
     }
+
+    private static String getExt(String name) {
+        int i = name.lastIndexOf('.');
+        return (i > 0 && i < name.length() - 1) ? name.substring(i + 1) : "";
+    }
+
 
 }

@@ -37,9 +37,9 @@ ftp:
   remote-dir:
 
 # 临时目录配置
-  fms:
-    temp:
-        dir: C:/temp/
+fms:
+  temp:
+    dir: C:/temp/
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
@@ -77,6 +77,9 @@ user:
 
 # Spring配置
 spring:
+  mvc:
+    async:
+      request-timeout: 600s
   # 资源信息
   messages:
     # 国际化资源文件路径
@@ -86,6 +89,9 @@ spring:
   # 文件上传
   servlet:
     multipart:
+      location: C:/temp/             # 临时目录（确保存在且可写）
+      file-size-threshold: 5MB       # >5MB 就先落盘，避免内存占用
+      resolve-lazily: true           # 延迟解析，减少过滤器干扰
       # 单个文件大小
       max-file-size: 1024MB
       # 设置总上传的文件大小
