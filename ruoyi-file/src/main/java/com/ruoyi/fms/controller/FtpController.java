@@ -726,6 +726,8 @@ public class FtpController {
     }
 
 
+
+
     @Anonymous
     @PostMapping(
             value = "/batchProcessUpload",
@@ -754,10 +756,11 @@ public class FtpController {
         for (MultipartFile mf : files) {
             if (mf.isEmpty()) return AjaxResult.error("存在空文件");
 
-            // 1) 取原名（不要 URLDecode），并做 Windows 安全化
+            // 1) 取原名 → 智能 URL 解码 → Windows 安全化
             String rawName = mf.getOriginalFilename();
-            String originalName = (rawName == null || rawName.isEmpty()) ? "unnamed" : rawName;
-            String safeOriginalName = sanitizeWinFileName(originalName); // ✅ 仅用于远端重命名/展示
+            String name0 = (rawName == null || rawName.isEmpty()) ? "unnamed" : rawName;
+            String decodedName = smartDecodeFilename(name0);     // ← 加这步
+            String safeOriginalName = sanitizeWinFileName(decodedName);
             String ext = getExt(safeOriginalName);
 
             // 2) 本地使用“安全临时名”（避免非法字符/重复/过长路径）
@@ -796,7 +799,6 @@ public class FtpController {
                 "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"
         ));
         if (reserved.contains(upper)) base = "_" + base;
-        // Windows 总路径限制 ~260（经典路径），这里仅限制文件名长度，给路径留余量
         return base.length() > 180 ? base.substring(0, 180) : base;
     }
 
@@ -805,5 +807,41 @@ public class FtpController {
         return (i > 0 && i < name.length() - 1) ? name.substring(i + 1) : "";
     }
 
+    private static final java.util.regex.Pattern HEX_ENC   = java.util.regex.Pattern.compile("%[0-9A-Fa-f]{2}");
+    private static final java.util.regex.Pattern RFC5987   = java.util.regex.Pattern.compile("(?i)^([A-Z0-9\\-]+)''(.+)$");
+    // 例如 "UTF-8''%E6%8A%A5%E5%91%8A.pdf"
 
+    private static String smartDecodeFilename(String s) {
+        if (s == null || s.isEmpty()) return "unnamed";
+
+        // ① 先兼容 filename*=charset''%XX... 这种 RFC 5987 形式（偶尔会直接出现在 originalFilename）
+        java.util.regex.Matcher m = RFC5987.matcher(s);
+        if (m.matches()) {
+            String cs  = m.group(1);     // charset
+            String enc = m.group(2);     // %XX...
+            try {
+                return java.net.URLDecoder.decode(enc, java.nio.charset.Charset.forName(cs).name());
+            } catch (Exception ignore) { /* 回退到 UTF-8 逻辑 */ }
+        }
+
+        // ② 常规：仅当出现 %XX 才尝试解码，避免“好端端的中文名被二次解坏”
+        if (HEX_ENC.matcher(s).find()) {
+            try {
+                // 保护 '+'，避免被 URLDecoder 当成空格
+                String t = s.replace("+", "%2B");
+                String once = java.net.URLDecoder.decode(t, java.nio.charset.StandardCharsets.UTF_8.name());
+                // 若还是有 %XX，最多再解一次（防双重编码）
+                if (HEX_ENC.matcher(once).find()) {
+                    String twice = java.net.URLDecoder.decode(once.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8.name());
+                    return twice;
+                }
+                return once;
+            } catch (Exception ignore) {
+                // 忽略异常，直接返回原名
+            }
+        }
+
+        // ③ 看起来没有 URL 编码，就原样返回
+        return s;
+    }
 }
