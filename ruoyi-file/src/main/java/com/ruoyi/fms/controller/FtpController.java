@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.util.*;
 
 import java.util.stream.Collectors;
@@ -725,9 +726,6 @@ public class FtpController {
         }
     }
 
-
-
-
     @Anonymous
     @PostMapping(
             value = "/batchProcessUpload",
@@ -735,56 +733,144 @@ public class FtpController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public AjaxResult batchProcessUpload(
-            @RequestPart("files") List<MultipartFile> files,     // ✅ 用 @RequestPart
+            @RequestPart("files") List<MultipartFile> files,
             @RequestParam("matchID") String matchID,
             @RequestParam(value = "PlanTrackingNumber", required = false) String planTrackingNumber,
-            @RequestParam(value = "convertToPdf", defaultValue = "false") boolean convertToPdf) throws IOException {
+            @RequestParam(value = "convertToPdf", defaultValue = "false") boolean convertToPdf,
+            HttpServletRequest request) throws IOException {
 
-        if (files == null || files.isEmpty()) return AjaxResult.error("请至少上传一个文件");
-        if (matchID == null || matchID.trim().isEmpty()) return AjaxResult.error("matchID 不能为空");
+        final long reqStartNs = System.nanoTime();
+        final String reqId = UUID.randomUUID().toString().substring(0, 8);
+        final String clientIp = firstNonEmpty(request.getHeader("X-Forwarded-For"), request.getRemoteAddr());
+        long totalBytes = 0L;
+        int successCount = 0;
 
-        final String tempDir = ftpService.getTempDir();          // 确保不是 null
+        // 参数快速校验（失败也要带耗时）
+        if (files == null || files.isEmpty()) {
+            long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+            log.warn("upload.fail reqId={} client={} matchID={} reason='empty files' elapsedMs={}",
+                    reqId, clientIp, matchID, elapsedMs);
+            return AjaxResult.error("请至少上传一个文件");
+        }
+        if (matchID == null || matchID.trim().isEmpty()) {
+            long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+            log.warn("upload.fail reqId={} client={} reason='empty matchID' elapsedMs={}",
+                    reqId, clientIp, elapsedMs);
+            return AjaxResult.error("matchID 不能为空");
+        }
+
+        final String tempDir = ftpService.getTempDir();
         if (tempDir == null || tempDir.trim().isEmpty()) {
+            long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+            log.warn("upload.fail reqId={} client={} matchID={} reason='tempDir not configured' elapsedMs={}",
+                    reqId, clientIp, matchID, elapsedMs);
             return AjaxResult.error("临时目录未配置");
         }
         File tmpRoot = new File(tempDir);
         if (!tmpRoot.exists() && !tmpRoot.mkdirs()) {
+            long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+            log.warn("upload.fail reqId={} client={} matchID={} reason='mkdirs failed' dir='{}' elapsedMs={}",
+                    reqId, clientIp, matchID, tempDir, elapsedMs);
             return AjaxResult.error("无法创建临时目录: " + tempDir);
         }
 
         List<String> fileIds = new ArrayList<>();
+        // 每个文件的阶段日志
         for (MultipartFile mf : files) {
-            if (mf.isEmpty()) return AjaxResult.error("存在空文件");
+            if (mf.isEmpty()) {
+                long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+                log.warn("upload.fail reqId={} client={} matchID={} reason='one empty file' elapsedMs={}",
+                        reqId, clientIp, matchID, elapsedMs);
+                return AjaxResult.error("存在空文件");
+            }
 
-            // 1) 取原名 → 智能 URL 解码 → Windows 安全化
+            final long fileStartNs = System.nanoTime();
+            final long declaredSize = mf.getSize();         // 由客户端声明的大小（不一定等于最终写入）
+            totalBytes += Math.max(0, declaredSize);
+
+            // 1) 文件名处理
             String rawName = mf.getOriginalFilename();
             String name0 = (rawName == null || rawName.isEmpty()) ? "unnamed" : rawName;
-            String decodedName = smartDecodeFilename(name0);     // ← 加这步
+            String decodedName = smartDecodeFilename(name0);
             String safeOriginalName = sanitizeWinFileName(decodedName);
             String ext = getExt(safeOriginalName);
 
-            // 2) 本地使用“安全临时名”（避免非法字符/重复/过长路径）
+            // 2) 落盘
+            long saveStart = System.nanoTime();
             Path localPath = Files.createTempFile(tmpRoot.toPath(), "upload_", ext.isEmpty() ? "" : ("." + ext));
-
-            // 3) 流式落盘，避免一次性进内存
+            long bytesWritten;
             try (InputStream in = mf.getInputStream()) {
-                Files.copy(in, localPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                bytesWritten = Files.copy(in, localPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException io) {
+                long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+                long saveMs = nsToMs(System.nanoTime() - saveStart);
+                log.warn("upload.fail reqId={} client={} matchID={} stage=TEMP_SAVE file='{}' size={}B saveMs={} err='{}' totalElapsedMs={}",
+                        reqId, clientIp, matchID, safeOriginalName, declaredSize, saveMs, io.getMessage(), elapsedMs);
                 return AjaxResult.error("写入临时文件失败: " + io.getMessage());
             }
+            long saveMs = nsToMs(System.nanoTime() - saveStart);
 
-            // 4) 计算远端子目录并上传（被动模式/二进制请在 ftpService 里确保）
+            // 3) FTP 上传
+            long ftpStart = System.nanoTime();
             String subFolder = "OA/" + matchID;
             boolean ok = ftpService.uploadThenRenameByListing(localPath.toString(), subFolder, safeOriginalName);
+            long ftpMs = nsToMs(System.nanoTime() - ftpStart);
             try { Files.deleteIfExists(localPath); } catch (IOException ignore) {}
 
-            if (!ok) return AjaxResult.error("上传并重命名失败: " + safeOriginalName);
+            if (!ok) {
+                long elapsedMs = nsToMs(System.nanoTime() - reqStartNs);
+                log.warn("upload.fail reqId={} client={} matchID={} stage=FTP_UPLOAD file='{}' size={}B saveMs={} ftpMs={} totalElapsedMs={}",
+                        reqId, clientIp, matchID, safeOriginalName, bytesWritten, saveMs, ftpMs, elapsedMs);
+                return AjaxResult.error("上传并重命名失败: " + safeOriginalName);
+            }
 
-            // 5) 生成 fileID
+            // 4) 成功一个文件
+            long oneElapsedMs = nsToMs(System.nanoTime() - fileStartNs);
             String fileID = fileService.generateFileID(19);
             fileIds.add(fileID);
+            successCount++;
+
+            log.info("upload.file.ok reqId={} client={} matchID={} file='{}' size={}B saveMs={} ftpMs={} fileElapsedMs={}",
+                    reqId, clientIp, matchID, safeOriginalName, bytesWritten, saveMs, ftpMs, oneElapsedMs);
         }
-        return AjaxResult.success(fileIds);
+
+        // 总结日志（全部成功）
+        long totalMs = nsToMs(System.nanoTime() - reqStartNs);
+        double mb = totalBytes / (1024.0 * 1024.0);
+        double rate = (totalMs > 0) ? (mb / (totalMs / 1000.0)) : 0.0; // MB/s
+
+        log.info("upload.done reqId={} client={} matchID={} files={} success={} totalBytes={}B ({:.2f}MB) elapsedMs={} rate={:.2f}MBps",
+                reqId, clientIp, matchID, files.size(), successCount, totalBytes, mb, totalMs, rate);
+
+        // 可选：把统计信息返回给前端（不需要可删除）
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("reqId", reqId);
+        stats.put("files", files.size());
+        stats.put("success", successCount);
+        stats.put("totalBytes", totalBytes);
+        stats.put("elapsedMs", totalMs);
+        stats.put("rateMBps", round2(rate));
+
+        AjaxResult okRes = AjaxResult.success(fileIds);
+        okRes.put("stats", stats);
+        return okRes;
+    }
+
+    // ---------- 辅助方法 ----------
+    private static long nsToMs(long ns) { return Duration.ofNanos(ns).toMillis(); }
+    private static double round2(double v) { return Math.round(v * 100.0) / 100.0; }
+    // 替代 String#isBlank —— 兼容 JDK8
+    private static boolean isNullOrBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    // 取第一个非空非空白字符串（用于获取客户端 IP 等场景）
+    private static String firstNonEmpty(String... vals) {
+        if (vals == null) return null;
+        for (String v : vals) {
+            if (!isNullOrBlank(v)) return v;
+        }
+        return null;
     }
 
     /** 仅去掉 Windows 非法字符，并处理保留名/结尾空格点/过长等 */
