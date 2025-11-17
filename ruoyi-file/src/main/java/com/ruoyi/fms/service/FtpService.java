@@ -513,7 +513,7 @@ public class    FtpService {
      * TCListFilesByCode：根据物料编码列出所有可下载文件
      */
     public List<FileMeta> TCListFilesByCode(String code) {
-        String sanitized = code.replace("/", "#").replace("*", "星");
+        String sanitized = code.replace("/", "#").replace("*", "星").replace("%","百");
         FTPClient ftp = new FTPClient();
         ftp.setControlEncoding("GBK");
         FTPClientConfig cfg = new FTPClientConfig(FTPClientConfig.SYST_NT);
