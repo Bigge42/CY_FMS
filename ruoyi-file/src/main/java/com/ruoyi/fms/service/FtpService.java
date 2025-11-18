@@ -14,6 +14,7 @@ import org.springframework.util.StreamUtils;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,6 +27,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -762,7 +764,7 @@ public class    FtpService {
                 // 4.2 构造下载链接
                 String downloadUrl = UriComponentsBuilder
                         .fromHttpUrl(baseUrl)
-                        .path("/mapper/fms/ftp/TCdownload")
+                        .path("/fms/ftp/TCdownload")
                         .queryParam("path", encodedPath)
                         .build()
                         .toUriString();
