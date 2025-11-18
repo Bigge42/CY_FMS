@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- ★ namespace 一定要和接口全限定名一模一样 -->
+<mapper namespace="com.ruoyi.fms.mapper.FileSqlMapper">
+
+    <!-- 直接返回 Map，key 就是列名：file_name / file_mtime / record_mtime -->
+    <select id="selectFilesByFileMtimeBetween" resultType="java.util.Map">
+        SELECT
+            file_name,
+            file_mtime,
+            record_mtime
+        FROM file_update_log
+        WHERE record_mtime <![CDATA[ >= ]]> #{startTime}
+          AND record_mtime <![CDATA[ <  ]]> #{endTime}
+        ORDER BY file_mtime
+    </select>
+
+</mapper>
