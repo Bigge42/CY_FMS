@@ -75,7 +75,8 @@ public class FtpController {
             "Exterior Dimension Drawing",          // 外形尺寸图
             "Calculation Report",               // 计算书
             "Supplier Raw Material Attachment",    // 供应商原材料附件
-            "OA"
+            "OA",
+            "MOM File"
     );
 
     /**
@@ -125,6 +126,8 @@ public class FtpController {
                 return "Supplier Raw Material Attachment";// 供应商原材料附件
             case 19:
                 return "OA"; //OA
+            case 20:
+                return "MOM File";
             default:
                 return null;
         }
