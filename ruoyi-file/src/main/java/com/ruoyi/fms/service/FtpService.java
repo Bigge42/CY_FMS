@@ -295,6 +295,45 @@ public class    FtpService {
     }
 
     /**
+     * 将文件移动到指定历史目录（软删除）。
+     *
+     * @param remoteFolderPath  当前文件所在远程目录（例如 "uploads/合格证"）
+     * @param remoteFileName    当前文件名
+     * @param historyFolderPath 历史文件夹路径（例如 "uploads/合格证/history"）
+     * @return 如果移动成功，返回 true；否则返回 false
+     * @throws IOException 如果发生 I/O 错误
+     */
+    public boolean moveFileToHistory(String remoteFolderPath,
+                                     String remoteFileName,
+                                     String historyFolderPath) throws IOException {
+        FTPClient ftpClient = new FTPClient();
+        try {
+            connectAndLogin(ftpClient);
+            ftpClient.enterLocalPassiveMode();
+
+            // 启用 UTF-8 编码
+            enableUTF8Encoding(ftpClient);
+
+            // 确保历史目录存在
+            mkdirsSilent(ftpClient, historyFolderPath);
+
+            String sourcePath = remoteFolderPath + "/" + remoteFileName;
+            String targetPath = historyFolderPath + "/" + remoteFileName;
+
+            boolean success = ftpClient.rename(sourcePath, targetPath);
+            if (success) {
+                log.info("文件移动成功: {} -> {}", sourcePath, targetPath);
+            } else {
+                log.error("文件移动失败: {} -> {}. 回复码: {}, 回复信息: {}",
+                        sourcePath, targetPath, ftpClient.getReplyCode(), ftpClient.getReplyString());
+            }
+            return success;
+        } finally {
+            disconnect(ftpClient);
+        }
+    }
+
+    /**
      * 打开 FTP 上某个文件的输入流，用于流式读取。
      *
      * @param remoteFolder 远程目录（相对于 ftpConfig.getRemoteDir()）
@@ -907,4 +946,3 @@ public class    FtpService {
         return subFolder.startsWith("/") ? subFolder.substring(1) : subFolder;
     }
 }
-

@@ -75,7 +75,8 @@ public class FtpController {
             "Exterior Dimension Drawing",          // 外形尺寸图
             "Calculation Report",               // 计算书
             "Supplier Raw Material Attachment",    // 供应商原材料附件
-            "OA"
+            "OA",
+            "MOM File"
     );
 
     /**
@@ -125,6 +126,8 @@ public class FtpController {
                 return "Supplier Raw Material Attachment";// 供应商原材料附件
             case 19:
                 return "OA"; //OA
+            case 20:
+                return "MOM File";
             default:
                 return null;
         }
@@ -323,6 +326,70 @@ public class FtpController {
                 return Response.error("数据库标记文件记录为删除失败");
             }
             log.info("文件记录已标记为删除: FileID={}", cyFile.getFileID());
+
+            return Response.success("文件删除成功");
+        } catch (Exception e) {
+            log.error("文件删除失败: {}", e.getMessage(), e);
+            return Response.error("文件删除失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除文件接口（根据 fileId 软删除并移动到历史目录）
+     *
+     * @param fileId    文件ID
+     * @param updatedBy 更新人（可选）
+     * @return 删除结果
+     */
+    @Anonymous
+    @DeleteMapping("/deleteByFileId")
+    public Response deleteFileByFileId(@RequestParam("fileId") String fileId,
+                                       @RequestParam(value = "updatedBy", required = false) String updatedBy) {
+        try {
+            if (fileId == null || fileId.trim().isEmpty()) {
+                return Response.error("fileId 不能为空");
+            }
+
+            CYFile cyFile = fileService.findFileById(fileId);
+            if (cyFile == null) {
+                log.warn("未找到对应的文件记录: FileID={}", fileId);
+                return Response.error("未找到对应的文件记录");
+            }
+
+            String fileUrl = cyFile.getFileURL();
+            if (fileUrl == null || !fileUrl.contains("/")) {
+                log.warn("文件路径格式不正确: FileID={} fileUrl={}", fileId, fileUrl);
+                return Response.error("文件路径格式不正确");
+            }
+
+            int lastSlashIndex = fileUrl.lastIndexOf('/');
+            String remoteFolderPath = fileUrl.substring(0, lastSlashIndex);
+            String remoteFileName = fileUrl.substring(lastSlashIndex + 1);
+            String historyFolderPath = remoteFolderPath + "/history";
+
+            boolean moved = ftpService.moveFileToHistory(remoteFolderPath, remoteFileName, historyFolderPath);
+            if (!moved) {
+                log.error("文件移动到历史目录失败: FileID={} fileUrl={}", fileId, fileUrl);
+                return Response.error("文件移动到历史目录失败");
+            }
+
+            String newFileUrl = ftpService.getFtpUrl(historyFolderPath, remoteFileName);
+            if (newFileUrl == null) {
+                log.warn("构建历史文件 URL 失败: FileID={}", fileId);
+                return Response.error("构建历史文件 URL 失败");
+            }
+
+            CYFile updateFile = new CYFile();
+            updateFile.setFileID(fileId);
+            updateFile.setUpdatedBy(updatedBy == null || updatedBy.trim().isEmpty() ? "system" : updatedBy);
+            updateFile.setFileURL(newFileUrl);
+            updateFile.setDeleteFlag(true);
+
+            int updateResult = fileService.updateFileRecord(updateFile);
+            if (updateResult <= 0) {
+                log.warn("数据库标记文件记录为删除失败: FileID={}", fileId);
+                return Response.error("数据库标记文件记录为删除失败");
+            }
 
             return Response.success("文件删除成功");
         } catch (Exception e) {
