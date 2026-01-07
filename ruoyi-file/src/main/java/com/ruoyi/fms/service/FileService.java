@@ -91,6 +91,8 @@ public class FileService {
                 return "SRA"; //Supplier Raw Material Attachment
             case 19:
                 return "OA";
+            case 20:
+                return "MOM"; // MOM File
             default:
                 return "UNK"; // Unknown
         }
