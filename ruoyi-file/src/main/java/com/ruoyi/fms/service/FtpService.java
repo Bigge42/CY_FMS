@@ -576,11 +576,28 @@ public class    FtpService {
                 // SMT 路径
                 String dir = "/SMT/smtpdf";
                 if (ftp.changeWorkingDirectory(dir)) {
+                    String codeLower = sanitized.toLowerCase(Locale.ROOT);
                     for (FTPFile f : ftp.listFiles()) {
-                        if (!f.isDirectory() && f.getName().equals(sanitized + ".pdf")) {
+                        if (f.isDirectory()) {
+                            continue;
+                        }
+                        String name = f.getName();
+                        String lowerName = name.toLowerCase(Locale.ROOT);
+                        if (!lowerName.endsWith(".pdf")) {
+                            continue;
+                        }
+
+                        // 兼容以下常见命名：
+                        // 1) 169900931-004.pdf
+                        // 2) 169900931-004 BG.pdf
+                        // 3) 169900931-004_01.pdf
+                        boolean exactMatch = lowerName.equals(codeLower + ".pdf");
+                        boolean prefixMatch = lowerName.startsWith(codeLower + " ")
+                                || lowerName.startsWith(codeLower + "_")
+                                || lowerName.startsWith(codeLower + "-");
+                        if (exactMatch || prefixMatch) {
                             Date lm = f.getTimestamp().getTime();
-                            result.add(new FileMeta(dir, f.getName(), lm));
-                            break;
+                            result.add(new FileMeta(dir, name, lm));
                         }
                     }
                 }
