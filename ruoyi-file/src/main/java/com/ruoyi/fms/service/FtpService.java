@@ -569,10 +569,11 @@ public class    FtpService {
             ftp.setFileType(FTP.BINARY_FILE_TYPE);
 
 
+            boolean isTzFixedLengthCode = sanitized.matches("^\\d{9}-\\d{3}$");
             boolean hasDotOrDash = sanitized.contains(".") || sanitized.contains("-");
             boolean hasPCode = sanitized.matches("(?i).*P\\d{10}.*");
 
-            if (hasDotOrDash || hasPCode) {
+            if ((hasDotOrDash || hasPCode) && !isTzFixedLengthCode) {
                 // SMT 路径
                 String dir = "/SMT/smtpdf";
                 if (ftp.changeWorkingDirectory(dir)) {
