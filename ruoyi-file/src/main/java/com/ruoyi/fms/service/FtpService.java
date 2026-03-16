@@ -589,12 +589,8 @@ public class    FtpService {
 
                         // 兼容以下常见命名：
                         // 1) 169900931-004.pdf
-                        // 2) 169900931-004 BG.pdf
-                        // 3) 169900931-004_01.pdf
                         boolean exactMatch = lowerName.equals(codeLower + ".pdf");
-                        boolean prefixMatch = lowerName.startsWith(codeLower + " ")
-                                || lowerName.startsWith(codeLower + "_")
-                                || lowerName.startsWith(codeLower + "-");
+                        boolean prefixMatch = lowerName.startsWith(codeLower + "-");
                         if (exactMatch || prefixMatch) {
                             Date lm = f.getTimestamp().getTime();
                             result.add(new FileMeta(dir, name, lm));
