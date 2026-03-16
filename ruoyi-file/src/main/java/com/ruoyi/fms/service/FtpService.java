@@ -569,10 +569,12 @@ public class    FtpService {
             ftp.setFileType(FTP.BINARY_FILE_TYPE);
 
 
+            // 固定编码格式（如：169900931-004）虽然包含 '-'，但业务上应强制走 TZ 路径
+            boolean isFixedTzCode = sanitized.matches("^[A-Za-z0-9]{9}-[A-Za-z0-9]{3}$");
             boolean hasDotOrDash = sanitized.contains(".") || sanitized.contains("-");
             boolean hasPCode = sanitized.matches("(?i).*P\\d{10}.*");
 
-            if (hasDotOrDash || hasPCode) {
+            if (!isFixedTzCode && (hasDotOrDash || hasPCode)) {
                 // SMT 路径
                 String dir = "/SMT/smtpdf";
                 for (FTPFile f : ftp.listFiles()) {
